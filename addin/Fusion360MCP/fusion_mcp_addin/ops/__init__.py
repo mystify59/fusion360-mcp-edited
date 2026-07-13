@@ -16,6 +16,7 @@ from . import (  # noqa: F401
     export,
     feature,
     material,
+    mesh,
     parameter,
     primitive,
     query,
