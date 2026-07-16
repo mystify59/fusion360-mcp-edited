@@ -31,16 +31,36 @@ def import_mesh(ctx, params):
         raise OpError(ERR_NOT_FOUND, "Mesh file not found: {}".format(path))
 
     comp = ctx.build_target(params)
-    im = ctx.app.importManager
-    try:
-        opts = im.createMeshImportOptions(path)
-    except Exception as exc:  # noqa: BLE001
-        raise OpError(ERR_INVALID_PARAMS, "Cannot read mesh file.", str(exc))
+    design = ctx.ensure_design()
+
+    units_map = {
+        "mm": adsk.fusion.MeshUnits.MillimeterMeshUnit,
+        "cm": adsk.fusion.MeshUnits.CentimeterMeshUnit,
+        "m": adsk.fusion.MeshUnits.MeterMeshUnit,
+        "in": adsk.fusion.MeshUnits.InchMeshUnit,
+        "ft": adsk.fusion.MeshUnits.FootMeshUnit,
+    }
+    unit = units_map.get(str(optional(params, "units", "mm", types=str)).lower(),
+                         adsk.fusion.MeshUnits.MillimeterMeshUnit)
 
     before = comp.meshBodies.count
+    # Parametric designs (designType == 1) require mesh bodies to be added inside
+    # a base feature; direct-edit designs can add straight to meshBodies.
+    is_parametric = design.designType == adsk.fusion.DesignTypes.ParametricDesignType
+    base = None
     try:
-        im.importToTarget2(opts, comp)
+        if is_parametric:
+            base = comp.features.baseFeatures.add()
+            base.startEdit()
+        comp.meshBodies.add(path, unit)
+        if base is not None:
+            base.finishEdit()
     except Exception as exc:  # noqa: BLE001
+        try:
+            if base is not None:
+                base.finishEdit()
+        except Exception:
+            pass
         raise OpError(ERR_INVALID_PARAMS, "Mesh import failed.", str(exc))
     after = comp.meshBodies.count
 

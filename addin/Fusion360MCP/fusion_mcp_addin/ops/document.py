@@ -3,6 +3,7 @@
 import adsk.core
 
 from ._common import op, optional
+from ..bridge.protocol import ERR_INTERNAL, OpError
 
 
 @op(
@@ -53,17 +54,33 @@ def list_documents(ctx, params):
 def close_others(ctx, params):
     app = ctx.app
     active = app.activeDocument
+    if active is None:
+        return {"closed": 0, "remaining": app.documents.count, "kept": None}
+
+    # Snapshot references up front (the collection re-indexes as we close).
     docs = [app.documents.item(i) for i in range(app.documents.count)]
+
+    # `d is active` is WRONG: app.documents.item(i) hands back a fresh Python
+    # wrapper each call, so identity never matches and the active doc gets closed
+    # too (this once closed EVERY document). Fusion API objects compare the
+    # underlying object with `==`. As a safety net, if nothing matches the active
+    # doc — which would mean we're about to close everything — refuse instead.
+    to_close = [d for d in docs if not (d == active)]
+    if docs and len(to_close) == len(docs):
+        raise OpError(
+            ERR_INTERNAL,
+            "Refusing to close: could not identify the active document, which would "
+            "close everything. / 无法识别活动文档，已中止以免全部关闭。",
+        )
+
     closed = 0
-    for d in docs:
-        if d is active:
-            continue
+    for d in to_close:
         try:
             d.close(False)   # False = do not save changes
             closed += 1
         except Exception:
             pass
-    return {"closed": closed, "remaining": app.documents.count, "kept": active.name if active else None}
+    return {"closed": closed, "remaining": app.documents.count, "kept": active.name}
 
 
 @op(
