@@ -71,7 +71,8 @@ def main():
         return 2
 
     section("document")
-    step("document.new", "document.new")
+    # confirm: the test deliberately runs in a fresh scratch document.
+    step("document.new", "document.new", {"confirm": True})
     step("document.list", "document.list", {}, lambda r: (len(r.get("documents", [])) >= 1, None))
 
     section("primitives")

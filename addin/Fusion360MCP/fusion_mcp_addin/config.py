@@ -17,7 +17,7 @@ import os
 import secrets
 from pathlib import Path
 
-VERSION = "0.5.0"
+VERSION = "0.6.0"
 EVENT_ID = "fusion360_mcp_request_event"
 # Fired (deferred) by system.restart to do an in-process stop→reimport→start on
 # the main thread — so bridge/__init__ code changes apply without a manual Stop→Run.
@@ -41,6 +41,11 @@ _DEFAULTS = {
     # open. Community servers all fail instead; this makes "draw a box" work
     # from a blank Fusion. Runs on the main thread (safe).
     "auto_create_document": True,
+    # Refuse document.new while another document is open unless the caller passes
+    # confirm=true. Stray "Untitled" documents pile up fast when an agent opens one
+    # per part, and only the user can close them by hand — so the default is to keep
+    # working in the document that is already open. Set false to allow freely.
+    "guard_new_document": True,
     # Auto-dismiss blocking modal dialogs (save/recover/server-verification, etc.)
     # that would otherwise freeze Fusion's main thread and stall every op. This is
     # handled by an EXTERNAL guard process (bridge/dialog_guard.py) because such
@@ -111,9 +116,14 @@ def get_settings():
         settings["auto_create_document"] = _as_bool(
             os.environ["FUSION_MCP_AUTO_CREATE_DOCUMENT"]
         )
+    if "FUSION_MCP_GUARD_NEW_DOCUMENT" in os.environ:
+        settings["guard_new_document"] = _as_bool(
+            os.environ["FUSION_MCP_GUARD_NEW_DOCUMENT"]
+        )
 
     settings["allow_arbitrary_code"] = _as_bool(settings["allow_arbitrary_code"])
     settings["auto_create_document"] = _as_bool(settings["auto_create_document"], True)
+    settings["guard_new_document"] = _as_bool(settings["guard_new_document"], True)
     return settings
 
 

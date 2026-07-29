@@ -161,9 +161,10 @@ need a Fusion **Stop→Run**; op edits are picked up by `system.reload`.
 
 ## Status & roadmap
 
-**Done (v0.5.0)** — every tool below validated against a *real* Fusion 360 install
+**Done (v0.6.0)** — every tool below validated against a *real* Fusion 360 install
 (Jan 2026 build, Python 3.14):
 
+- **Workspace discipline** — the agent works in the document you already have open: `fusion_new_document` refuses while a document is open unless it passes `confirm=true` (setting `guard_new_document`), so stray `Untitled` documents stop piling up. Finish up from the agent side with `fusion_save_document` / `fusion_save_document_as` / `fusion_close_document(save=true|false)` / `fusion_close_other_documents` — a never-saved document is written into a real project automatically, no interactive dialog.
 - **Active component** — build a multi-part model in ONE document: `assembly.activate_component` makes later sketch/feature/primitive ops target that component (each part isolated, existing bodies untouched); default is the root component.
 - **Auto-dismiss blocking dialogs** — an external guard process closes save/recover/server-verification/stray modals that would otherwise freeze Fusion (they hold the GIL, so an in-process watchdog can't); safe WM_CLOSE-first, only when an op is stuck or the title matches a nuisance allowlist.
 - **`system.restart`** — full in-process reload (incl. bridge/`__init__`) over RPC, so code changes apply **without a manual Fusion Stop→Run**.

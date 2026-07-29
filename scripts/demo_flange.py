@@ -53,7 +53,8 @@ def main():
 
     print("=== Build: bolt-circle flange (OD{} x {}mm, bore {}, {}x M{} on Ø{}) ===".format(
         OD, THICK, BORE, N_BOLTS, int(BOLT_D), BOLT_CIRCLE_D))
-    call("new document", "document.new")
+    # confirm: this demo deliberately builds in a fresh scratch document.
+    call("new document", "document.new", {"confirm": True})
     call("base disk Ø{}x{}".format(OD, THICK), "primitive.cylinder",
          {"radius": OD / 2, "height": THICK, "name": "flange"})
     call("center bore Ø{}".format(BORE), "feature.hole",

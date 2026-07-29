@@ -50,7 +50,8 @@ def tool(op, params=None, show=None):
 
 def main():
     user("新建一个设计,我要做一个 L 形安装支架。")
-    tool("document.new")
+    # The user asked for a new design, hence confirm=True (the guard would refuse otherwise).
+    tool("document.new", {"confirm": True})
 
     user("先做一块 120×80×6mm 的底板。")
     tool("primitive.box", {"width": 120, "depth": 80, "height": 6, "name": "base"},

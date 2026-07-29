@@ -60,7 +60,8 @@ def main():
          tolerate=["disabled"])
 
     print("\n=== setup geometry ===")
-    call("new document", "document.new")
+    # confirm: the test deliberately runs in a fresh scratch document.
+    call("new document", "document.new", {"confirm": True})
     call("box blk 30^3", "primitive.box", {"width": 30, "depth": 30, "height": 20, "name": "blk"})
     call("box blk2 (overlap)", "primitive.box", {"width": 30, "depth": 30, "height": 20, "x": 15, "name": "blk2"})
 

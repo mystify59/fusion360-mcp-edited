@@ -3,6 +3,46 @@
 All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.0] - 2026-07-29
+
+### Added — workspace discipline (stop opening a document per task)
+- `document.new` is now **guarded**: while any document is open it refuses unless
+  the caller passes `confirm=true`, and the error tells the agent to build in the
+  open document instead (several parts = one document, one component each). Stray
+  `Untitled` documents pile up fast when an agent opens one per part, and only the
+  user can close them by hand. New add-in setting `guard_new_document`
+  (default true, env `FUSION_MCP_GUARD_NEW_DOCUMENT`) turns the guard off. With
+  nothing open the guard is inactive, so "just draw a box" still works.
+- The MCP server INSTRUCTIONS gained a **workspace-discipline** section (work in
+  the already-open document, one document per model, don't touch existing bodies,
+  how to finish up) so the rules reach the model before it picks a tool.
+
+### Added — save & close from the agent side
+- `document.close` (**save=true / save=false**) — 保存并关闭 / 不保存关闭. A
+  never-saved document is written into a real project first (optional `name` /
+  `project`); if that save fails the document is left **open** rather than losing
+  work. It always calls `close(False)` after saving explicitly, because
+  `close(True)` on a never-saved document raises a blocking modal Save dialog that
+  freezes the whole bridge.
+- `document.save_as` — save a copy under a new name / project, original untouched.
+- `document.projects` — list the projects a document can be saved into, plus the
+  resolved save target.
+- `document.close_others` gained a `save` flag (default false).
+- MCP tools: `fusion_close_document`, `fusion_save_document_as`,
+  `fusion_list_projects`, `fusion_close_other_documents(save=...)`,
+  `fusion_new_document(confirm=...)` — 105 tools total.
+
+### Fixed
+- Saving no longer depends on `Data.activeProject`, which raises
+  `InternalValidationError : group` on some accounts. The save target now falls
+  back to the project of another open document, then to the only project, then to
+  a default-named one.
+
+### Changed
+- **`document.list` response shape**: each entry is now an object
+  `{name, is_active, is_modified, is_saved}` instead of a bare name string.
+- `document.info` also reports `open_documents`, `active_component`, `is_saved`.
+
 ## [0.5.0] - 2026-06-29
 
 ### Added — active component (keep multi-part models in ONE document)

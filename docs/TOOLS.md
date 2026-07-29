@@ -6,7 +6,7 @@ All distances are **millimetres (mm)**; angles are **degrees**. Bodies and sketc
 
 全部尺寸单位为**毫米 (mm)**，角度为**度**。实体/草图用**索引或名称**引用。
 
-Total tools / 工具总数: **101** (includes the gated `fusion_run_script`).
+Total tools / 工具总数: **105** (includes the gated `fusion_run_script`).
 
 | Tool | Hints | Parameters (required **bold**) | Description |
 |------|-------|--------------------------------|-------------|
@@ -26,6 +26,8 @@ Total tools / 工具总数: **101** (includes the gated `fusion_run_script`).
 | `fusion_cam_post_process` | write | **setup**, operation, post_processor, units, output_folder | Post-process a setup (or one operation) to a G-code file on the host (default ~/fusion-mcp-exports/nc). post_processor is a generic post name. |
 | `fusion_chamfer` | write | **body**, **distance**, edges | Chamfer edges of a body by `distance` mm. edges='all' or a list of indices. |
 | `fusion_circular_pattern` | write | **body**, **count**, angle, axis | Pattern a body around axis x/y/z: `count` copies spread over `angle` degrees. |
+| `fusion_close_document` | destructive | **save**, document, name, project, description | Close a document — save=true saves it first, save=false discards unsaved changes. Closes the active document unless `document` names another open one. With save=true a never-saved document is written into the active Fusion project first (use `name` / `project` to choose where); if that save fails the document is left open rather than losing the work. |
+| `fusion_close_other_documents` | destructive | save | Close every open document EXCEPT the active one — handy for tidying up after stray documents accumulated. save=false discards their unsaved changes. |
 | `fusion_combine` | destructive | **target**, **tools**, operation, keep_tools | Boolean-combine a target body with one or more tool bodies (by index or name). operation: join (union), cut (subtract tools from target), or intersect. Set keep_tools=true to preserve the tool bodies. |
 | `fusion_create_component` | write | **name** | Create a new (empty) component as an occurrence in the design. Build geometry, then joint components together to form an assembly. |
 | `fusion_create_flat_pattern` | write | **body** | Create a flat pattern from an EXISTING sheet-metal body. Note: Fusion's API cannot create sheet-metal flanges/bends (model those interactively). |
@@ -36,7 +38,7 @@ Total tools / 工具总数: **101** (includes the gated `fusion_run_script`).
 | `fusion_delete_all` | destructive | — | Delete every timeline feature, clearing the design. Destructive. |
 | `fusion_delete_body` | destructive | **body** | Delete a body. Destructive. |
 | `fusion_delete_parameter` | destructive | **name** | Delete a user parameter by name (model parameters cannot be deleted). |
-| `fusion_document_info` | read-only | — | Summarize the active document: display units and counts of bodies, components, sketches, and parameters. |
+| `fusion_document_info` | read-only | — | Summarize the active document: display units, counts of bodies, components, sketches and parameters, save state, and the active component. |
 | `fusion_draft` | write | **body**, **angle**, faces, plane | Apply draft to faces of a body. angle deg; pull-direction plane xy/xz/yz. faces is a list of face indices (from fusion_list_faces) or omitted for all. |
 | `fusion_export_dxf` | write | **sketch**, path | Export a sketch to a 2D DXF file (e.g. for laser cutting / drawings). |
 | `fusion_export_f3d` | write | path | Export a native Fusion archive (.f3d), preserving the full design tree. |
@@ -56,12 +58,13 @@ Total tools / 工具总数: **101** (includes the gated `fusion_run_script`).
 | `fusion_list_appearances` | read-only | filter, limit | List available appearance names (optionally filtered by substring). |
 | `fusion_list_bodies` | read-only | — | List all solid/surface bodies with index, name, volume (mm³), and bounding box (mm). Use the index or name to target a body in other tools. |
 | `fusion_list_components` | read-only | — | List all components in the design with their body counts. |
-| `fusion_list_documents` | read-only | — | List the names of all currently open Fusion documents. |
+| `fusion_list_documents` | read-only | — | List all open Fusion documents with their active / modified / saved state. |
 | `fusion_list_faces` | read-only | **body** | List a body's faces (index, area mm², is_planar, centroid, normal). Use a planar face's index to sketch/drill on it (fusion_create_sketch_on_face, fusion_hole with on_body/on_face). |
 | `fusion_list_features` | read-only | — | List timeline features in creation order. |
 | `fusion_list_joints` | read-only | — | List joints (name, type), plus as-built-joint and rigid-group counts. |
 | `fusion_list_occurrences` | read-only | — | List component occurrences: name, grounded, visible, body count. |
 | `fusion_list_parameters` | read-only | — | List all parameters (user + model) with expression, value, and unit. |
+| `fusion_list_projects` | read-only | — | List the Fusion projects a document can be saved into, and which one is active (where fusion_save_document / _as put a never-saved document). |
 | `fusion_list_sketches` | read-only | — | List sketches with index, name, and number of closed profiles. |
 | `fusion_loft` | write | **sketches**, operation | Loft a smooth solid between profiles taken from a list of sketch indices/ names (>=2), in order. Each sketch should contain one closed profile. |
 | `fusion_measure_angle` | read-only | **body_a**, **body_b** | Angle (degrees) between the first faces of two bodies. |
@@ -69,7 +72,7 @@ Total tools / 工具总数: **101** (includes the gated `fusion_run_script`).
 | `fusion_mirror` | write | **body**, plane | Mirror a body across plane xy/xz/yz. |
 | `fusion_move_body` | write | **body**, dx, dy, dz | Translate a body by (dx, dy, dz) millimetres. |
 | `fusion_move_component` | write | **name**, dx, dy, dz | Translate a component occurrence by (dx, dy, dz) millimetres. |
-| `fusion_new_document` | write | — | Create a new, empty Fusion 360 design document and make it active. Call this first if no design is open. |
+| `fusion_new_document` | write | confirm | Create a NEW empty Fusion design document. Prefer NOT calling this. If a document is already open, build in THAT one — several parts belong in ONE document as separate components (fusion_create_component). Stray documents pile up and only the user can close them by hand. Set confirm=true only when the user explicitly asked for a new document/project, or when nothing is open at all (then it is a no-op flag). Without confirm the call is refused while any document is open. |
 | `fusion_offset_faces` | write | **body**, **distance**, faces | Offset faces of a body by distance mm (creates an offset surface body). |
 | `fusion_offset_plane` | write | **offset**, base | Create a construction plane offset from a base plane (xy/xz/yz) by `offset` mm. Returns its index for use as a sketch plane. |
 | `fusion_physical_properties` | read-only | body | Mass (g), volume (mm³), area (mm²), density, and center of mass for a body (by index/name) or the whole design if omitted. |
@@ -79,7 +82,8 @@ Total tools / 工具总数: **101** (includes the gated `fusion_run_script`).
 | `fusion_revolve` | write | **sketch**, axis, angle, operation, profile | Revolve a sketch profile around axis x/y/z by `angle` degrees. |
 | `fusion_rigid_group` | write | **components**, include_children | Lock 2+ components together as a rigid group (pass a list of names). |
 | `fusion_run_script` | destructive | **code** | Execute arbitrary Fusion 360 Python in-process (POWER TOOL, enabled by the operator). Available globals: adsk, app, ui, design, root. Assign a `result` variable to return a value; stdout is captured. Use only when a dedicated tool does not exist. |
-| `fusion_save_document` | idempotent | description | Save the active document. The document must have been saved once interactively in Fusion first (the first save picks a project folder). |
+| `fusion_save_document` | idempotent | description, document, name, project | Save a document (the active one unless `document` names another open one). A never-saved document is saved into the active Fusion project automatically (optionally under `name` / into `project`), so no interactive dialog is needed. |
+| `fusion_save_document_as` | write | **name**, project, description, document | Save a document as a NEW file called `name` (in `project`, else the active project). Use this to keep the original untouched. |
 | `fusion_scale_body` | write | **body**, **factor** | Uniformly scale a body by `factor` about the origin (2.0 doubles its size). |
 | `fusion_screenshot` | read-only | width, height, fit | Capture the active Fusion viewport and return it as a PNG image so you can visually inspect the model. Set fit=False to keep the current camera. |
 | `fusion_set_appearance` | idempotent | **body**, **name** | Apply an appearance (by name) to a body. Use fusion_list_appearances to discover valid names (e.g. 'Steel', 'Aluminum', 'ABS'). |

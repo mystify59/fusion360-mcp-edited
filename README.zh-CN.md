@@ -161,8 +161,9 @@ python scripts/smoketest.py           # 重测
 
 ## 状态与路线图
 
-**已完成(v0.5.0)** —— 下列每个工具都已在**真实 Fusion 360**(2026/01 版本,Python 3.14)上验证:
+**已完成(v0.6.0)** —— 下列每个工具都已在**真实 Fusion 360**(2026/01 版本,Python 3.14)上验证:
 
+- **工作空间纪律** —— AI 默认在你**已打开的那个文档**里干活:已有文档打开时 `fusion_new_document` 会被拒绝,除非显式传 `confirm=true`(可用 `guard_new_document` 关掉),再也不会攒一堆 `Untitled`。收尾也能由 AI 完成:`fusion_save_document` / `fusion_save_document_as` / `fusion_close_document(save=true|false)`(保存并关闭 / 不保存关闭) / `fusion_close_other_documents`;从未保存过的文档会自动存进真实项目,不弹交互对话框。
 - **活动零部件** —— 多零件模型在**一个文档**里完成:`assembly.activate_component` 让后续 sketch/feature/primitive 等算子建到该零部件(各零件隔离、不动现有物件);默认仍是根部件。
 - **自动关闭挡路弹窗** —— 外部守护进程关掉 保存/恢复/服务器验证/误弹 等会冻结 Fusion 的模态(它们独占 GIL,进程内看门狗无效);WM_CLOSE 优先(=取消,不保存、不丢数据),仅在算子卡住或标题命中滋扰白名单时动作。
 - **`system.restart`** —— 通过 RPC 在**进程内**整体重载(含 bridge/`__init__`),改代码**无需手动 Stop→Run**。

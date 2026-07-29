@@ -48,7 +48,8 @@ def call(label, op, params=None, show=None, tolerate=None):
 
 def main():
     print("=== Assembly ===")
-    call("new document", "document.new")
+    # confirm: this demo deliberately builds in a fresh scratch document.
+    call("new document", "document.new", {"confirm": True})
     for name in ("base", "arm", "link", "g1", "g2"):
         call("create component '{}'".format(name), "assembly.create_component", {"name": name})
     call("list occurrences", "assembly.list_occurrences", show=lambda r: "{} occ".format(r["count"]))

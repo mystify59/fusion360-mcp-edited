@@ -69,6 +69,21 @@ def step(label, op, params=None, check=None):
     return result
 
 
+def step_refuses(label, op, params=None, expect=""):
+    """Run one op that MUST fail; PASS when it does (and mentions `expect`)."""
+    try:
+        result = call(op, params or {})
+    except FusionMCPError as exc:
+        first = str(exc).splitlines()[0]
+        ok = expect.lower() in str(exc).lower() if expect else True
+        _results.append((_section, label, ok, first))
+        print("  [{}] {}  <- refused: {}".format("PASS" if ok else "FAIL", label, first))
+        return None
+    _results.append((_section, label, False, "did NOT refuse"))
+    print("  [FAIL] {}  <- did NOT refuse".format(label))
+    return result
+
+
 def approx(a, b, tol=0.02):
     return abs(float(a) - float(b)) <= tol
 
@@ -105,7 +120,9 @@ def main(argv):
     # ---------------- A: document + units ----------------
     if want("A"):
         section("A document + units")
-        step("document.new", "document.new", check=lambda r: (bool(r.get("document")), r.get("document")))
+        # confirm: the test deliberately runs in a fresh scratch document.
+        step("document.new", "document.new", {"confirm": True},
+             check=lambda r: (bool(r.get("document")), r.get("document")))
         step("units.set mm", "units.set", {"units": "mm"}, lambda r: (r.get("units") == "mm", r.get("units")))
         step("units.get", "units.get", {}, lambda r: (r.get("units") == "mm", r.get("units")))
         step("document.info", "document.info", {}, lambda r: (r.get("bodies") == 0, "bodies={}".format(r.get("bodies"))))
@@ -274,11 +291,24 @@ def main(argv):
                 step("  {} on disk".format(fmt), "units.get", {},
                      (lambda p: (lambda r: (os.path.exists(p), p)))(res["path"]))
 
-    # ---------------- N: document.save (soft) ----------------
+    # ---------------- N: new-document guard + close ----------------
+    # document.save / document.save_as are NOT automated here: they write a real
+    # file into the user's Fusion project, which a test has no business doing.
     if want("N"):
-        section("N document.save (first-save may soft-fail)")
-        step("document.save", "document.save", {"description": "livetest"},
-             lambda r: (True, "saved={} reason={}".format(r.get("saved"), r.get("reason", ""))))
+        section("N new-document guard + close")
+        # Create first, so the guard check below holds even when run as --section N
+        # against an empty Fusion.
+        step("document.new confirm=true", "document.new", {"confirm": True},
+             lambda r: (r.get("open_documents", 0) >= 1, "open={}".format(r.get("open_documents"))))
+        step_refuses("document.new without confirm is refused", "document.new", {},
+                     expect="already open")
+        step("document.list", "document.list", {},
+             lambda r: (r.get("count", 0) >= 1, "count={}".format(r.get("count"))))
+        step("document.close save=false", "document.close", {"save": False},
+             lambda r: (bool(r.get("closed")), "closed={} remaining={}".format(
+                 r.get("closed"), r.get("remaining"))))
+        step_refuses("document.close needs an explicit save flag", "document.close", {},
+                     expect="save")
 
     # ---------------- summary ----------------
     total = len(_results)
