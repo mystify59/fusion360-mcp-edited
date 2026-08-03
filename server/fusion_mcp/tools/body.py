@@ -1,6 +1,6 @@
 """Body tools."""
 
-from typing import Union
+from typing import Optional, Union
 
 from ._helpers import anno
 
@@ -27,6 +27,27 @@ def register(mcp, client):
     ) -> dict:
         """Translate a body by (dx, dy, dz) millimetres."""
         return client.call("body.move", {"body": body, "dx": dx, "dy": dy, "dz": dz})
+
+    @mcp.tool(annotations=anno())
+    def fusion_rotate_body(
+        body: Union[int, str],
+        angle: float,
+        axis: Union[str, list] = "z",
+        origin: Optional[list] = None,
+    ) -> dict:
+        """Rotate a body by `angle` degrees (right-hand rule) about an axis through
+        a point. axis: "x"/"y"/"z" or a free direction vector [i, j, k].
+        origin: [x, y, z] in millimetres, defaults to the world origin. Use this to
+        build inclined geometry that revolve/extrude alone cannot produce."""
+        return client.call(
+            "body.rotate",
+            {
+                "body": body,
+                "angle": angle,
+                "axis": axis,
+                "origin": origin if origin is not None else [0.0, 0.0, 0.0],
+            },
+        )
 
     @mcp.tool(annotations=anno(destructive=True))
     def fusion_combine(
