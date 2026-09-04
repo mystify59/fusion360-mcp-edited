@@ -1,8 +1,11 @@
 """Solid feature tools."""
 
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from ._helpers import anno
+
+
+FeatureOperation = Literal["new", "join", "cut", "intersect"]
 
 
 def register(mcp, client):
@@ -10,7 +13,7 @@ def register(mcp, client):
     def fusion_extrude(
         sketch: Union[int, str],
         distance: float,
-        operation: str = "new",
+        operation: FeatureOperation = "new",
         direction: str = "positive",
         profile: Union[int, str] = "all",
     ) -> dict:
@@ -27,7 +30,7 @@ def register(mcp, client):
         sketch: Union[int, str],
         axis: str = "z",
         angle: float = 360.0,
-        operation: str = "new",
+        operation: FeatureOperation = "new",
         profile: Union[int, str] = "all",
     ) -> dict:
         """Revolve a sketch profile around axis x/y/z by `angle` degrees."""
@@ -90,7 +93,7 @@ def register(mcp, client):
     def fusion_sweep(
         profile_sketch: Union[int, str],
         path_sketch: Union[int, str],
-        operation: str = "new",
+        operation: FeatureOperation = "new",
         profile: Union[int, str] = 0,
     ) -> dict:
         """Sweep a profile (from profile_sketch) along the first curve of path_sketch.
@@ -103,7 +106,7 @@ def register(mcp, client):
         )
 
     @mcp.tool(annotations=anno())
-    def fusion_loft(sketches: list, operation: str = "new") -> dict:
+    def fusion_loft(sketches: list, operation: FeatureOperation = "new") -> dict:
         """Loft a smooth solid between profiles taken from a list of sketch indices/
         names (>=2), in order. Each sketch should contain one closed profile."""
         return client.call("feature.loft", {"sketches": sketches, "operation": operation})

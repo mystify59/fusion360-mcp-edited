@@ -4,15 +4,18 @@ Each draw tool accepts EITHER an existing ``sketch`` (index/name) OR a ``plane``
 (xy/xz/yz) on which a new sketch is created. Returns the sketch index to feed
 into feature tools."""
 
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from ._helpers import anno
 
 
+PlaneRef = Union[Literal["xy", "xz", "yz"], int]
+
+
 def register(mcp, client):
     @mcp.tool(annotations=anno())
-    def fusion_create_sketch(plane: str = "xy", name: Optional[str] = None) -> dict:
-        """Create an empty sketch on a construction plane (xy/xz/yz)."""
+    def fusion_create_sketch(plane: PlaneRef = "xy", name: Optional[str] = None) -> dict:
+        """Create an empty sketch on a base plane (xy/xz/yz) or construction-plane index."""
         return client.call("sketch.create", {"plane": plane, "name": name})
 
     @mcp.tool(annotations=anno())
@@ -32,7 +35,7 @@ def register(mcp, client):
         y: float = 0.0,
         mode: str = "corner",
         sketch: Optional[Union[int, str]] = None,
-        plane: str = "xy",
+        plane: PlaneRef = "xy",
     ) -> dict:
         """Draw a rectangle (mm). mode='corner' treats (x,y) as a corner;
         mode='center' treats (x,y) as the center. Creates a new sketch on `plane`
@@ -50,7 +53,7 @@ def register(mcp, client):
         x: float = 0.0,
         y: float = 0.0,
         sketch: Optional[Union[int, str]] = None,
-        plane: str = "xy",
+        plane: PlaneRef = "xy",
     ) -> dict:
         """Draw a circle (mm) by center (x,y) and radius OR diameter."""
         return client.call(
@@ -66,7 +69,7 @@ def register(mcp, client):
         x2: float,
         y2: float,
         sketch: Optional[Union[int, str]] = None,
-        plane: str = "xy",
+        plane: PlaneRef = "xy",
     ) -> dict:
         """Draw a single line segment from (x1,y1) to (x2,y2), in mm."""
         return client.call(
@@ -83,7 +86,7 @@ def register(mcp, client):
         x3: float,
         y3: float,
         sketch: Optional[Union[int, str]] = None,
-        plane: str = "xy",
+        plane: PlaneRef = "xy",
     ) -> dict:
         """Draw a 3-point arc (mm): from start (x1,y1), through (x2,y2), to end (x3,y3).
         Useful as a sweep/revolve path."""
@@ -101,7 +104,7 @@ def register(mcp, client):
         y: float = 0.0,
         rotation_deg: float = 0.0,
         sketch: Optional[Union[int, str]] = None,
-        plane: str = "xy",
+        plane: PlaneRef = "xy",
     ) -> dict:
         """Draw a regular polygon (mm) by center, circumradius, and side count (>=3)."""
         return client.call(
@@ -116,7 +119,7 @@ def register(mcp, client):
         type: str = "fit_points",
         degree: int = 3,
         sketch: Optional[Union[int, str]] = None,
-        plane: str = "xy",
+        plane: PlaneRef = "xy",
     ) -> dict:
         """Draw a spline through points [[x,y],...] (mm). type 'fit_points' or
         'control_points' (uses degree)."""

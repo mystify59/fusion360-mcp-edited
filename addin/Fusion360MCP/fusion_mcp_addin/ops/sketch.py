@@ -1,7 +1,8 @@
 """Sketch operations.
 
 All coordinates are millimetres in the sketch plane. Geometry ops accept either
-an existing ``sketch`` (index/name) or a ``plane`` (xy/xz/yz) on which a new
+an existing ``sketch`` (index/name) or a ``plane`` (xy/xz/yz or construction-
+plane index) on which a new
 sketch is created — so a single call like ``sketch.rectangle`` can both create a
 sketch and draw on it.
 """
