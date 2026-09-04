@@ -40,11 +40,24 @@ def register(mcp, client):
         return client.call("query.get_body", {"body": body})
 
     @mcp.tool(annotations=anno(readonly=True))
+    def fusion_body_info(body: Union[int, str]) -> dict:
+        """Inspect one body by index or name, including its current operative ID,
+        component, topology counts, volume, visibility, and bounding box."""
+        return client.call("query.body_info", {"body": body})
+
+    @mcp.tool(annotations=anno(readonly=True))
     def fusion_list_faces(body: Union[int, str]) -> dict:
         """List a body's faces (index, area mm², is_planar, centroid, normal). Use a
         planar face's index to sketch/drill on it (fusion_create_sketch_on_face,
         fusion_hole with on_body/on_face)."""
         return client.call("query.list_faces", {"body": body})
+
+    @mcp.tool(annotations=anno(readonly=True))
+    def fusion_list_edges(body: Union[int, str]) -> dict:
+        """Enumerate one body's edges for selective operations. Returns a topology
+        snapshot plus index, curve type, length, points, radius when circular, and
+        adjacent face indices/types for each edge."""
+        return client.call("query.list_edges", {"body": body})
 
     @mcp.tool(annotations=anno(readonly=True))
     def fusion_physical_properties(body: Union[int, str, None] = None) -> dict:

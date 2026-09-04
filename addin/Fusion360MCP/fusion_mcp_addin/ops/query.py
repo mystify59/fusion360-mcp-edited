@@ -4,6 +4,7 @@ import adsk.core
 import adsk.fusion
 
 from ._common import bbox_mm, body_summary, op, require
+from ._geometry import midpoint_mm, point_mm
 from ..bridge.protocol import ERR_INVALID_PARAMS, OpError
 
 
@@ -102,6 +103,78 @@ def get_body(ctx, params):
     except Exception:
         pass
     return data
+
+
+def _body_info(ctx, body):
+    data = {
+        "name": body.name,
+        "component": getattr(getattr(body, "parentComponent", None), "name", None),
+        "is_solid": body.isSolid,
+        "is_visible": body.isVisible,
+        "volume_mm3": body.volume * 1000.0,
+        "bbox_mm": bbox_mm(getattr(body, "boundingBox", None)),
+        "face_count": body.faces.count,
+        "edge_count": body.edges.count,
+        "vertex_count": body.vertices.count,
+    }
+    token = getattr(body, "entityToken", None)
+    if token:
+        data["operative_id"] = token
+    return data
+
+
+@op("query.body_info", summary="Targeted body state and topology snapshot.", readonly=True)
+def body_info(ctx, params):
+    body = ctx.get_body(require(params, "body", (int, str)))
+    return _body_info(ctx, body)
+
+
+def _geometry_type(geometry, suffix):
+    object_type = getattr(geometry, "objectType", "") or geometry.__class__.__name__
+    name = object_type.rsplit("::", 1)[-1]
+    if name.endswith(suffix):
+        name = name[: -len(suffix)]
+    return name.lower()
+
+
+@op("query.list_edges", summary="Enumerate one body's edges for selective operations.", readonly=True)
+def list_edges(ctx, params):
+    body = ctx.get_body(require(params, "body", (int, str)))
+    face_indices = {body.faces.item(i).entityToken: i for i in range(body.faces.count)}
+    out = []
+    for i in range(body.edges.count):
+        edge = body.edges.item(i)
+        geometry = edge.geometry
+        entry = {
+            "index": i,
+            "curve_type": _geometry_type(geometry, "3D"),
+            "length_mm": edge.length * 10.0,
+        }
+        try:
+            entry["start_mm"] = point_mm(edge.startVertex.geometry)
+            entry["end_mm"] = point_mm(edge.endVertex.geometry)
+        except Exception:
+            pass
+        try:
+            midpoint = midpoint_mm(edge)
+            if midpoint is not None:
+                entry["midpoint_mm"] = midpoint
+        except Exception:
+            pass
+        radius = getattr(geometry, "radius", None)
+        if radius is not None:
+            entry["radius_mm"] = radius * 10.0
+        adjacent = []
+        for j in range(edge.faces.count):
+            face = edge.faces.item(j)
+            adjacent.append({
+                "index": face_indices.get(getattr(face, "entityToken", None), -1),
+                "surface_type": _geometry_type(face.geometry, ""),
+            })
+        entry["adjacent_faces"] = adjacent
+        out.append(entry)
+    snapshot = _body_info(ctx, body)
+    return {"topology_snapshot": snapshot, "count": len(out), "edges": out}
 
 
 @op("query.list_faces", summary="List a body's faces (index, area, planar?, centroid) for face selection.", readonly=True)

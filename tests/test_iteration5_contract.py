@@ -1,5 +1,8 @@
 """Public tool contracts introduced for the Iteration 5 CAD workflow."""
 
+import importlib.util
+from pathlib import Path
+
 import pytest
 
 from fusion_mcp.app import build_app
@@ -22,3 +25,43 @@ def test_extrude_operation_exposes_actual_values(tools):
     """An unconstrained operation schema permits values rejected by Fusion."""
     operation = tools["fusion_extrude"].parameters["properties"]["operation"]
     assert operation["enum"] == ["new", "join", "cut", "intersect"]
+
+
+@pytest.mark.parametrize("name", ["fusion_body_info", "fusion_list_edges"])
+def test_targeted_query_tools_are_read_only(tools, name):
+    """A write annotation on targeted inspection would trigger needless approval."""
+    assert name in tools
+    assert tools[name].annotations.readOnlyHint is True
+
+
+def test_list_edges_requires_a_body(tools):
+    """Design-wide edge enumeration would reintroduce ambiguous selection."""
+    required = tools["fusion_list_edges"].parameters["required"]
+    assert required == ["body"]
+
+
+def test_curve_midpoint_starts_from_parameter_extent():
+    """Calling getParameterAtLength without a start parameter drops midpoints."""
+    helper_path = (
+        Path(__file__).parents[1]
+        / "addin/Fusion360MCP/fusion_mcp_addin/ops/_geometry.py"
+    )
+    spec = importlib.util.spec_from_file_location("fusion_addin_geometry", helper_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    class Evaluator:
+        def getParameterExtents(self):
+            return True, 4.0, 10.0
+
+        def getParameterAtLength(self, start, length):
+            assert start == 4.0
+            assert length == 2.5
+            return True, 7.0
+
+        def getPointAtParameter(self, parameter):
+            assert parameter == 7.0
+            return True, type("Point", (), {"x": 1.0, "y": 2.0, "z": 3.0})()
+
+    edge = type("Edge", (), {"evaluator": Evaluator(), "length": 5.0})()
+    assert module.midpoint_mm(edge) == [10.0, 20.0, 30.0]
