@@ -92,9 +92,10 @@ def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--reload", action="store_true", help="hot-reload ops before testing")
     ap.add_argument("--section", default=None, help="run only this section letter")
+    ap.add_argument("--iteration5", action="store_true", help="run bounded Iteration 5 evidence cases")
     args = ap.parse_args(argv)
 
-    only = args.section.upper() if args.section else None
+    only = "I5" if args.iteration5 else (args.section.upper() if args.section else None)
 
     def want(letter):
         return only is None or only == letter
@@ -309,6 +310,180 @@ def main(argv):
                  r.get("closed"), r.get("remaining"))))
         step_refuses("document.close needs an explicit save flag", "document.close", {},
                      expect="save")
+
+    # ---------------- I5: bounded iteration-5 capability chain ----------------
+    if want("I5"):
+        section("I5 bounded capability chain")
+        scratch = step(
+            "scratch document",
+            "document.new",
+            {"confirm": True},
+            lambda r: (bool(r.get("document")), r.get("document")),
+        )
+        scratch_created = scratch is not None
+        try:
+            step("units mm", "units.set", {"units": "mm"},
+                 lambda r: (r.get("units") == "mm", r.get("units")))
+            before = step("initial state", "document.info", {},
+                          lambda r: (r.get("bodies") == 0, "bodies={} sketches={}".format(
+                              r.get("bodies"), r.get("sketches"))))
+
+            # Offset plane -> integer plane reference -> downstream loft.
+            lower = call("sketch.circle", {"radius": 10, "plane": "xy"})
+            offset = call("construction.offset_plane", {"base": "xy", "offset": 30})
+            upper = step(
+                "sketch on enumerated construction plane",
+                "sketch.circle",
+                {"radius": 6, "plane": offset["index"]},
+                lambda r: (r.get("profiles", 0) == 1, "plane={} sketch={}".format(
+                    offset["index"], r.get("sketch_index"))),
+            )
+            if upper:
+                step(
+                    "offset-plane loft",
+                    "feature.loft",
+                    {"sketches": [lower["sketch_index"], upper["sketch_index"]], "operation": "new"},
+                    lambda r: (r.get("feature") == "loft" and r.get("state_after", {}).get("bodies") == 1,
+                               "state={}".format(r.get("state_after"))),
+                )
+
+            # Joined twin-eye link with repeated identity-preserving cuts.
+            call("primitive.box", {"width": 60, "depth": 12, "height": 8, "name": "I5_Web"})
+            call("primitive.cylinder", {"radius": 12, "height": 8, "x": -30, "name": "I5_Eye_L"})
+            call("primitive.cylinder", {"radius": 12, "height": 8, "x": 30, "name": "I5_Eye_R"})
+            step("join twin eyes to web", "body.combine",
+                 {"target": "I5_Web", "tools": ["I5_Eye_L", "I5_Eye_R"], "operation": "join"},
+                 lambda r: (r.get("state_after", {}).get("bodies") == 2,
+                            "state={}".format(r.get("state_after"))))
+            step("rename joined link", "body.rename", {"body": "I5_Web", "name": "I5_Link"})
+            identity0 = step("targeted link before holes", "query.body_info", {"body": "I5_Link"},
+                             lambda r: (bool(r.get("operative_id")), "id={} edges={}".format(
+                                 r.get("operative_id"), r.get("edge_count"))))
+            call("feature.hole", {"diameter": 12, "x": -30, "y": 0, "plane": "xy", "through_all": True})
+            identity1 = step("targeted link after hole 1", "query.body_info", {"body": "I5_Link"})
+            call("feature.hole", {"diameter": 12, "x": 30, "y": 0, "plane": "xy", "through_all": True})
+            identity2 = step(
+                "targeted link after hole 2",
+                "query.body_info",
+                {"body": "I5_Link"},
+                lambda r: (
+                    bool(r.get("operative_id"))
+                    and identity0 is not None
+                    and identity1 is not None
+                    and r.get("name") == identity0.get("name") == identity1.get("name"),
+                    "ids={}/{}/{} edges={}".format(
+                        (identity0 or {}).get("operative_id"),
+                        (identity1 or {}).get("operative_id"),
+                        r.get("operative_id"),
+                        r.get("edge_count"),
+                    ),
+                ),
+            )
+
+            edges = step(
+                "enumerate link edges",
+                "query.list_edges",
+                {"body": "I5_Link"},
+                lambda r: (
+                    r.get("count", 0) > 0
+                    and all("midpoint_mm" in edge for edge in r.get("edges", [])),
+                    "count={} snapshot_edges={}".format(
+                        r.get("count"), r.get("topology_snapshot", {}).get("edge_count")),
+                ),
+            )
+            selected = None
+            if edges:
+                candidates = [
+                    edge for edge in edges.get("edges", [])
+                    if edge.get("curve_type") == "line"
+                    and approx(edge.get("length_mm", 0), 8, tol=0.2)
+                    and len(edge.get("adjacent_faces", [])) == 2
+                ]
+                selected = candidates[0]["index"] if candidates else None
+            if selected is None:
+                _results.append((_section, "select web-to-eye transition edge", False,
+                                 "no verified 8 mm line edge"))
+                print("  [FAIL] select web-to-eye transition edge  <- no verified 8 mm line edge")
+            else:
+                step(
+                    "selective web-to-eye fillet",
+                    "feature.fillet",
+                    {"body": "I5_Link", "radius": 2, "edges": [selected]},
+                    lambda r: (
+                        r.get("selection", {}).get("edge_resolution") == [
+                            {"requested": selected, "resolved": selected, "status": "resolved"}
+                        ]
+                        and r.get("selection", {}).get("radius_mm") == 2.0,
+                        "selection={}".format(r.get("selection")),
+                    ),
+                )
+
+            step_refuses(
+                "invalid edge reports rollback and residue",
+                "feature.fillet",
+                {"body": "I5_Link", "radius": 2, "edges": [9999]},
+                expect="\"rollback\": \"confirmed\"",
+            )
+
+            # Bind to the actual model parameter created by an extrusion and
+            # verify the measured body changes when the parameter changes.
+            params_before = {p["name"] for p in call("parameter.list").get("parameters", [])}
+            call("primitive.box", {"width": 20, "depth": 20, "height": 10, "name": "I5_Parametric"})
+            param_body_before = call("query.body_info", {"body": "I5_Parametric"})
+            params_after = call("parameter.list").get("parameters", [])
+            new_params = [p for p in params_after if p.get("name") not in params_before]
+            height_params = [p for p in new_params if approx(p.get("value_internal_cm", -1), 1.0, tol=0.001)]
+            if not height_params:
+                _results.append((_section, "find bound extrusion parameter", False,
+                                 "new parameters={}".format(new_params)))
+                print("  [FAIL] find bound extrusion parameter  <- no 10 mm model parameter")
+            else:
+                bound = height_params[-1]["name"]
+                step("change bound extrusion parameter", "parameter.set",
+                     {"name": bound, "expression": "18 mm"},
+                     lambda r: (approx(r.get("value_internal_cm", 0), 1.8, tol=0.001),
+                                "{}={}".format(bound, r.get("expression"))))
+                step(
+                    "measure parametric geometry response",
+                    "query.body_info",
+                    {"body": "I5_Parametric"},
+                    lambda r: (
+                        approx((param_body_before.get("bbox_mm") or {}).get("size", [0, 0, 0])[2], 10, tol=0.1)
+                        and approx((r.get("bbox_mm") or {}).get("size", [0, 0, 0])[2], 18, tol=0.1),
+                        "height {} -> {} mm".format(
+                            (param_body_before.get("bbox_mm") or {}).get("size", [None, None, None])[2],
+                            (r.get("bbox_mm") or {}).get("size", [None, None, None])[2],
+                        ),
+                    ),
+                )
+
+            step(
+                "material evidence",
+                "query.physical_properties",
+                {"body": "I5_Link"},
+                lambda r: (
+                    "material_verified" in r
+                    and "assignment_scope" in r
+                    and r.get("volume_mm3", 0) > 0
+                    and (not r.get("material_verified") or bool(r.get("material_name"))),
+                    "verified={} material={} density={} mass={}".format(
+                        r.get("material_verified"), r.get("material_name"),
+                        r.get("density_g_per_cm3"), r.get("mass_g")),
+                ),
+            )
+            step("final state", "document.info", {},
+                 lambda r: (r.get("bodies", 0) >= 3,
+                            "bodies={} sketches={} params={}".format(
+                                r.get("bodies"), r.get("sketches"), r.get("parameters"))))
+        finally:
+            if scratch_created:
+                step("close scratch without saving", "document.close",
+                     {"save": False},
+                     lambda r: (bool(r.get("closed")), "closed={}".format(r.get("closed"))))
+                step("verify original document restored", "document.info", {},
+                     lambda r: (r.get("bodies") == 0 and not r.get("is_modified"),
+                                "document={} bodies={} modified={}".format(
+                                    r.get("document"), r.get("bodies"), r.get("is_modified"))))
 
     # ---------------- summary ----------------
     total = len(_results)
