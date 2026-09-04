@@ -68,7 +68,8 @@ def register(mcp, client):
         document: str = "",
     ) -> dict:
         """Save a document as a NEW file called `name` (in `project`, else the active
-        project). Use this to keep the original untouched."""
+        project). Use this to keep the original untouched. The current bridge confirms
+        the document and project but does not return a reopenable version identifier."""
         payload = {"name": name, "description": description}
         if project:
             payload["project"] = project

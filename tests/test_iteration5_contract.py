@@ -122,3 +122,34 @@ def test_operation_error_preserves_mutation_evidence():
     })
     assert '"rollback": "confirmed"' in message
     assert '"residual_entities": []' in message
+
+
+def test_addin_op_error_round_trips_evidence():
+    """Reconstructing an OpError must not strip dispatcher evidence from the wire."""
+    protocol_path = (
+        Path(__file__).parents[1]
+        / "addin/Fusion360MCP/fusion_mcp_addin/bridge/protocol.py"
+    )
+    spec = importlib.util.spec_from_file_location("fusion_bridge_protocol", protocol_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    error = module.OpError(
+        "not_found",
+        "bad edge",
+        evidence={"rollback": "confirmed", "residual_entities": []},
+    )
+    assert error.to_dict() == {
+        "code": "not_found",
+        "message": "bad edge",
+        "detail": "",
+        "rollback": "confirmed",
+        "residual_entities": [],
+    }
+
+
+def test_cleanup_and_checkpoint_limitations_are_public(tools):
+    """Agents must not infer unsupported cleanup or reopenable checkpoint behavior."""
+    delete_description = tools["fusion_delete_body"].description.lower()
+    save_as_description = tools["fusion_save_document_as"].description.lower()
+    assert "sketch" in delete_description and "construction" in delete_description
+    assert "reopenable version identifier" in save_as_description

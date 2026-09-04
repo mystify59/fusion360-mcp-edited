@@ -18,7 +18,8 @@ def register(mcp, client):
 
     @mcp.tool(annotations=anno(destructive=True))
     def fusion_delete_body(body: Union[int, str]) -> dict:
-        """Delete a body. Destructive."""
+        """Delete exactly one body and verify the resulting model state. Destructive.
+        This does not delete sketches, features, or construction geometry."""
         return client.call("body.delete", {"body": body})
 
     @mcp.tool(annotations=anno())

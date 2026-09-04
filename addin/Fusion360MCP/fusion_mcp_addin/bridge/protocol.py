@@ -23,14 +23,17 @@ ERR_INTERNAL = "internal_error"
 class OpError(Exception):
     """An operation-level error that maps cleanly to the wire format."""
 
-    def __init__(self, code, message, detail=""):
+    def __init__(self, code, message, detail="", evidence=None):
         super().__init__(message)
         self.code = code
         self.message = message
         self.detail = detail
+        self.evidence = dict(evidence or {})
 
     def to_dict(self):
-        return {"code": self.code, "message": self.message, "detail": self.detail}
+        result = {"code": self.code, "message": self.message, "detail": self.detail}
+        result.update(self.evidence)
+        return result
 
 
 def ok(result=None):

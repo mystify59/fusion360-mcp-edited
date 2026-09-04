@@ -37,7 +37,7 @@ Total tools / 工具总数: **108** (includes the gated `fusion_run_script`).
 | `fusion_create_sketch_on_face` | write | **body**, **face**, name | Create a sketch ON a planar face of a body. Get the face index from fusion_list_faces (is_planar=true). Sketch coordinates are then local to that face. |
 | `fusion_cylinder` | write | **height**, radius, diameter, x, y, name | Create a cylinder of `height` mm and `radius` OR `diameter` mm, centered on the XY origin. Auto-creates a document if none is open. |
 | `fusion_delete_all` | destructive | — | Delete every timeline feature, clearing the design. Destructive. |
-| `fusion_delete_body` | destructive | **body** | Delete a body. Destructive. |
+| `fusion_delete_body` | destructive | **body** | Delete exactly one body and verify the resulting model state. Destructive. This does not delete sketches, features, or construction geometry. |
 | `fusion_delete_parameter` | destructive | **name** | Delete a user parameter by name (model parameters cannot be deleted). |
 | `fusion_document_info` | read-only | — | Summarize the active document: display units, counts of bodies, components, sketches and parameters, save state, and the active component. |
 | `fusion_draft` | write | **body**, **angle**, faces, plane | Apply draft to faces of a body. angle deg; pull-direction plane xy/xz/yz. faces is a list of face indices (from fusion_list_faces) or omitted for all. |
@@ -86,7 +86,7 @@ Total tools / 工具总数: **108** (includes the gated `fusion_run_script`).
 | `fusion_rotate_body` | write | **body**, **angle**, axis, origin | Rotate a body by `angle` degrees (right-hand rule) about an axis through a point. axis: "x"/"y"/"z" or a free direction vector [i, j, k]. origin: [x, y, z] in millimetres, defaults to the world origin. Use this to build inclined geometry that revolve/extrude alone cannot produce. |
 | `fusion_run_script` | destructive | **code** | Execute arbitrary Fusion 360 Python in-process (POWER TOOL, enabled by the operator). Available globals: adsk, app, ui, design, root. Assign a `result` variable to return a value; stdout is captured. Use only when a dedicated tool does not exist. |
 | `fusion_save_document` | idempotent | description, document, name, project | Save a document (the active one unless `document` names another open one). A never-saved document is saved into the active Fusion project automatically (optionally under `name` / into `project`), so no interactive dialog is needed. |
-| `fusion_save_document_as` | write | **name**, project, description, document | Save a document as a NEW file called `name` (in `project`, else the active project). Use this to keep the original untouched. |
+| `fusion_save_document_as` | write | **name**, project, description, document | Save a document as a NEW file called `name` (in `project`, else the active project). Use this to keep the original untouched. The current bridge confirms the document and project but does not return a reopenable version identifier. |
 | `fusion_scale_body` | write | **body**, **factor** | Uniformly scale a body by `factor` about the origin (2.0 doubles its size). |
 | `fusion_screenshot` | read-only | width, height, fit | Capture the active Fusion viewport and return it as a PNG image so you can visually inspect the model. Set fit=False to keep the current camera. |
 | `fusion_set_appearance` | idempotent | **body**, **name** | Apply an appearance (by name) to a body. Use fusion_list_appearances to discover valid names (e.g. 'Steel', 'Aluminum', 'ABS'). |

@@ -128,7 +128,7 @@ class _BridgeHandler(BaseHTTPRequestHandler):
             self._send_json(200, protocol.ok(result))
         except protocol.OpError as oe:
             # Operational failure -> 200 + ok:false (uniform parsing on the server).
-            self._send_json(200, protocol.err(oe.code, oe.message, oe.detail))
+            self._send_json(200, {"ok": False, "error": oe.to_dict()})
         except Exception as exc:  # noqa: BLE001
             self._send_json(
                 500, protocol.err("internal_error", str(exc) or "Unhandled error.")

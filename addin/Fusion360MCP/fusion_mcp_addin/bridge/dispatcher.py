@@ -147,7 +147,14 @@ class Dispatcher:
 
         if "error" in box:
             e = box["error"]
-            raise OpError(e["code"], e["message"], e.get("detail", ""))
+            evidence = {
+                key: value
+                for key, value in e.items()
+                if key not in ("code", "message", "detail")
+            }
+            raise OpError(
+                e["code"], e["message"], e.get("detail", ""), evidence=evidence
+            )
         return box.get("result")
 
     # ---- main-thread side --------------------------------------------------
