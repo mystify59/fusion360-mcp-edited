@@ -99,3 +99,10 @@ def test_mutation_evidence_identifies_selection_and_state():
     assert result["state_before"]["timeline"] == 4
     assert result["state_after"]["timeline"] == 5
     assert result["residual_entities"] == []
+
+
+def test_physical_properties_documents_material_evidence(tools):
+    """Without provenance fields, calculated mass can be mistaken for verified mass."""
+    description = tools["fusion_physical_properties"].description.lower()
+    assert "material name" in description
+    assert "assignment scope" in description

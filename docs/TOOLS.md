@@ -6,7 +6,7 @@ All distances are **millimetres (mm)**; angles are **degrees**. Bodies and sketc
 
 全部尺寸单位为**毫米 (mm)**，角度为**度**。实体/草图用**索引或名称**引用。
 
-Total tools / 工具总数: **105** (includes the gated `fusion_run_script`).
+Total tools / 工具总数: **108** (includes the gated `fusion_run_script`).
 
 | Tool | Hints | Parameters (required **bold**) | Description |
 |------|-------|--------------------------------|-------------|
@@ -15,6 +15,7 @@ Total tools / 工具总数: **105** (includes the gated `fusion_run_script`).
 | `fusion_api_docs` | read-only | **name** | Get the Autodesk cloudhelp URL for an API class or member (e.g. 'ExtrudeFeatures.createInput'). |
 | `fusion_api_introspect` | read-only | **target**, query | Inspect the live Fusion API: list a class's (or an object path's) properties and method signatures. `target` is a class name (e.g. 'ExtrudeFeatures') or a path ('rootComponent.bRepBodies'); `query` filters member names. Use this to discover the exact API to drive via fusion_api_call. |
 | `fusion_as_built_joint` | write | **component_one**, **component_two** | Create an as-built joint (keeps both components in their current place). |
+| `fusion_body_info` | read-only | **body** | Inspect one body by index or name, including its current operative ID, component, topology counts, volume, visibility, and bounding box. |
 | `fusion_bounding_box` | read-only | — | Get the overall bounding box of the whole design, in millimetres. |
 | `fusion_box` | write | **width**, **depth**, **height**, x, y, name, component | Create a box (cuboid): width(X) x depth(Y) x height(Z) in mm, centered on the XY origin and rising in +Z. Auto-creates a document if none is open. For a cube, pass equal width/depth/height. Pass `component` (a component name from fusion_create_component) to build the box INSIDE that component — useful for building assembly parts to then joint together. |
 | `fusion_cam_create_operation` | write | **setup**, **strategy**, name, tool_diameter, stepdown, stepover | Add an operation to a setup by `strategy` (e.g. face, pocket2d, adaptive2d, contour2d, drill, bore). Optional tool_diameter/stepdown/stepover in mm. Note: most strategies need a tool assigned before a toolpath will generate. |
@@ -32,7 +33,7 @@ Total tools / 工具总数: **105** (includes the gated `fusion_run_script`).
 | `fusion_create_component` | write | **name** | Create a new (empty) component as an occurrence in the design. Build geometry, then joint components together to form an assembly. |
 | `fusion_create_flat_pattern` | write | **body** | Create a flat pattern from an EXISTING sheet-metal body. Note: Fusion's API cannot create sheet-metal flanges/bends (model those interactively). |
 | `fusion_create_parameter` | write | **name**, **expression**, unit, comment | Create a new user parameter (e.g. name='width', expression='40 mm'). |
-| `fusion_create_sketch` | write | plane, name | Create an empty sketch on a construction plane (xy/xz/yz). |
+| `fusion_create_sketch` | write | plane, name | Create an empty sketch on a base plane (xy/xz/yz) or construction-plane index. |
 | `fusion_create_sketch_on_face` | write | **body**, **face**, name | Create a sketch ON a planar face of a body. Get the face index from fusion_list_faces (is_planar=true). Sketch coordinates are then local to that face. |
 | `fusion_cylinder` | write | **height**, radius, diameter, x, y, name | Create a cylinder of `height` mm and `radius` OR `diameter` mm, centered on the XY origin. Auto-creates a document if none is open. |
 | `fusion_delete_all` | destructive | — | Delete every timeline feature, clearing the design. Destructive. |
@@ -59,6 +60,7 @@ Total tools / 工具总数: **105** (includes the gated `fusion_run_script`).
 | `fusion_list_bodies` | read-only | — | List all solid/surface bodies with index, name, volume (mm³), and bounding box (mm). Use the index or name to target a body in other tools. |
 | `fusion_list_components` | read-only | — | List all components in the design with their body counts. |
 | `fusion_list_documents` | read-only | — | List all open Fusion documents with their active / modified / saved state. |
+| `fusion_list_edges` | read-only | **body** | Enumerate one body's edges for selective operations. Returns a topology snapshot plus index, curve type, length, points, radius when circular, and adjacent face indices/types for each edge. |
 | `fusion_list_faces` | read-only | **body** | List a body's faces (index, area mm², is_planar, centroid, normal). Use a planar face's index to sketch/drill on it (fusion_create_sketch_on_face, fusion_hole with on_body/on_face). |
 | `fusion_list_features` | read-only | — | List timeline features in creation order. |
 | `fusion_list_joints` | read-only | — | List joints (name, type), plus as-built-joint and rigid-group counts. |
@@ -75,12 +77,13 @@ Total tools / 工具总数: **105** (includes the gated `fusion_run_script`).
 | `fusion_new_document` | write | confirm | Create a NEW empty Fusion design document. Prefer NOT calling this. If a document is already open, build in THAT one — several parts belong in ONE document as separate components (fusion_create_component). Stray documents pile up and only the user can close them by hand. Set confirm=true only when the user explicitly asked for a new document/project, or when nothing is open at all (then it is a no-op flag). Without confirm the call is refused while any document is open. |
 | `fusion_offset_faces` | write | **body**, **distance**, faces | Offset faces of a body by distance mm (creates an offset surface body). |
 | `fusion_offset_plane` | write | **offset**, base | Create a construction plane offset from a base plane (xy/xz/yz) by `offset` mm. Returns its index for use as a sketch plane. |
-| `fusion_physical_properties` | read-only | body | Mass (g), volume (mm³), area (mm²), density, and center of mass for a body (by index/name) or the whole design if omitted. |
+| `fusion_physical_properties` | read-only | body | Mass (g), volume (mm³), area (mm²), density, and center of mass for a body (by index/name) or the whole design if omitted. Also reports material name, material source, assignment scope, and whether material evidence was verified. |
 | `fusion_rectangular_pattern` | write | **body**, **count**, **spacing**, axis | Pattern a body in a line along axis x/y/z: `count` copies, `spacing` mm apart. |
 | `fusion_redo` | write | — | Redo the last undone operation. |
 | `fusion_rename_body` | idempotent | **body**, **name** | Rename a body. |
 | `fusion_revolve` | write | **sketch**, axis, angle, operation, profile | Revolve a sketch profile around axis x/y/z by `angle` degrees. |
 | `fusion_rigid_group` | write | **components**, include_children | Lock 2+ components together as a rigid group (pass a list of names). |
+| `fusion_rotate_body` | write | **body**, **angle**, axis, origin | Rotate a body by `angle` degrees (right-hand rule) about an axis through a point. axis: "x"/"y"/"z" or a free direction vector [i, j, k]. origin: [x, y, z] in millimetres, defaults to the world origin. Use this to build inclined geometry that revolve/extrude alone cannot produce. |
 | `fusion_run_script` | destructive | **code** | Execute arbitrary Fusion 360 Python in-process (POWER TOOL, enabled by the operator). Available globals: adsk, app, ui, design, root. Assign a `result` variable to return a value; stdout is captured. Use only when a dedicated tool does not exist. |
 | `fusion_save_document` | idempotent | description, document, name, project | Save a document (the active one unless `document` names another open one). A never-saved document is saved into the active Fusion project automatically (optionally under `name` / into `project`), so no interactive dialog is needed. |
 | `fusion_save_document_as` | write | **name**, project, description, document | Save a document as a NEW file called `name` (in `project`, else the active project). Use this to keep the original untouched. |

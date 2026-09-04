@@ -208,26 +208,64 @@ def list_faces(ctx, params):
     return {"count": faces.count, "faces": out}
 
 
-@op("query.physical_properties", summary="Mass/volume/area/center-of-mass of a body (or whole design).", readonly=True)
+def _material_record(material):
+    if material is None:
+        return None
+    name = getattr(material, "name", None)
+    if not name:
+        return None
+    parent = getattr(material, "parent", None)
+    source = getattr(parent, "name", None) or getattr(parent, "id", None)
+    if not source and parent is not None:
+        source = getattr(parent, "objectType", None)
+    return {"name": name, "source": source}
+
+
+def _design_material_records(design):
+    records = []
+    components = design.allComponents
+    for i in range(components.count):
+        bodies = components.item(i).bRepBodies
+        for j in range(bodies.count):
+            records.append(_material_record(getattr(bodies.item(j), "material", None)))
+    return records
+
+
+@op("query.physical_properties", summary="Physical properties with material name, source, and assignment scope.", readonly=True)
 def physical_properties(ctx, params):
     ref = params.get("body")
     if ref is not None:
-        props = ctx.get_body(ref).physicalProperties
+        body = ctx.get_body(ref)
+        props = body.physicalProperties
         scope = "body"
+        material_records = [_material_record(getattr(body, "material", None))]
+        assignment_scope = "body"
     else:
+        design = ctx.design()
         props = ctx.root().getPhysicalProperties(
             adsk.fusion.CalculationAccuracy.MediumCalculationAccuracy
         )
         scope = "design"
+        material_records = _design_material_records(design)
+        assignment_scope = "all_bodies"
     com = props.centerOfMass
-    return {
+    resolved = [record for record in material_records if record is not None]
+    names = sorted(set(record["name"] for record in resolved))
+    sources = sorted(set(record["source"] for record in resolved if record.get("source")))
+    verified = bool(material_records) and len(resolved) == len(material_records)
+    result = {
         "scope": scope,
         "mass_g": props.mass * 1000.0,
         "volume_mm3": props.volume * 1000.0,
         "area_mm2": props.area * 100.0,
         "density_g_per_cm3": props.density * 1000.0,
         "center_of_mass_mm": [com.x * 10.0, com.y * 10.0, com.z * 10.0],
+        "material_name": names[0] if len(names) == 1 else ("mixed" if names else None),
+        "material_source": sources[0] if len(sources) == 1 else ("mixed" if sources else None),
+        "assignment_scope": assignment_scope,
+        "material_verified": verified,
     }
+    return result
 
 
 @op("query.measure_distance", summary="Minimum distance (mm) between two bodies.", readonly=True)

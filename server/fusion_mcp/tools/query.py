@@ -62,7 +62,8 @@ def register(mcp, client):
     @mcp.tool(annotations=anno(readonly=True))
     def fusion_physical_properties(body: Union[int, str, None] = None) -> dict:
         """Mass (g), volume (mm³), area (mm²), density, and center of mass for a body
-        (by index/name) or the whole design if omitted."""
+        (by index/name) or the whole design if omitted. Also reports material name,
+        material source, assignment scope, and whether material evidence was verified."""
         return client.call("query.physical_properties", {"body": body})
 
     @mcp.tool(annotations=anno(readonly=True))
