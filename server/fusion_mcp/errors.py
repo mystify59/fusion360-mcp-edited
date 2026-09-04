@@ -4,6 +4,8 @@ Whatever we raise here becomes the error text the MCP client (Claude) shows the
 user, so the messages double as troubleshooting hints.
 """
 
+import json
+
 
 class FusionMCPError(RuntimeError):
     """Any user-facing failure from the server layer."""
@@ -42,4 +44,17 @@ def op_error_message(error):
     text = "[{}] {}".format(code, message)
     if detail:
         text += "\n" + detail
+    evidence_keys = (
+        "selection",
+        "target_after",
+        "state_before",
+        "state_after",
+        "residual_entities",
+        "rollback",
+    )
+    evidence = {key: error[key] for key in evidence_keys if key in error}
+    if evidence:
+        text += "\nMutation evidence: " + json.dumps(
+            evidence, ensure_ascii=False, sort_keys=True
+        )
     return text

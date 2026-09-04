@@ -7,6 +7,7 @@ import pytest
 
 from fusion_mcp.app import build_app
 from fusion_mcp.config import load_config
+from fusion_mcp.errors import op_error_message
 
 
 @pytest.fixture(scope="module")
@@ -106,3 +107,18 @@ def test_physical_properties_documents_material_evidence(tools):
     description = tools["fusion_physical_properties"].description.lower()
     assert "material name" in description
     assert "assignment scope" in description
+
+
+def test_operation_error_preserves_mutation_evidence():
+    """Dropping add-in evidence at the server boundary hides failed mutation state."""
+    message = op_error_message({
+        "code": "not_found",
+        "message": "Edge index 99 out of range.",
+        "detail": "",
+        "rollback": "confirmed",
+        "residual_entities": [],
+        "state_before": {"bodies": 1, "timeline": 3},
+        "state_after": {"bodies": 1, "timeline": 3},
+    })
+    assert '"rollback": "confirmed"' in message
+    assert '"residual_entities": []' in message
