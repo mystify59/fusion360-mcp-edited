@@ -65,3 +65,37 @@ def test_curve_midpoint_starts_from_parameter_extent():
 
     edge = type("Edge", (), {"evaluator": Evaluator(), "length": 5.0})()
     assert module.midpoint_mm(edge) == [10.0, 20.0, 30.0]
+
+
+def test_mutation_evidence_identifies_selection_and_state():
+    """Losing selection or before/after state would make a fillet unverifiable."""
+    helper_path = (
+        Path(__file__).parents[1]
+        / "addin/Fusion360MCP/fusion_mcp_addin/bridge/_evidence.py"
+    )
+    spec = importlib.util.spec_from_file_location("fusion_mutation_evidence", helper_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    result = module.mutation_evidence(
+        before={"bodies": 1, "timeline": 4, "entities": ["Link"]},
+        after={"bodies": 1, "timeline": 5, "entities": ["Link"]},
+        requested_edges=[2, 6],
+        resolved_edges=[2, 6],
+        target={"name": "Link", "operative_id": "token"},
+        radius_mm=3.0,
+    )
+    assert result["selection"] == {
+        "requested_edges": [2, 6],
+        "resolved_edges": [2, 6],
+        "radius_mm": 3.0,
+        "edge_resolution": [
+            {"requested": 2, "resolved": 2, "status": "resolved"},
+            {"requested": 6, "resolved": 6, "status": "resolved"},
+        ],
+    }
+    assert result["rollback"] == "not_required"
+    assert result["target_after"]["name"] == "Link"
+    assert result["state_before"]["timeline"] == 4
+    assert result["state_after"]["timeline"] == 5
+    assert result["residual_entities"] == []

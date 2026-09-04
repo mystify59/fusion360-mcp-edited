@@ -19,6 +19,7 @@ import adsk.core
 import adsk.fusion
 
 from ..config import EVENT_ID
+from ._evidence import mutation_evidence
 from .protocol import (
     ERR_INTERNAL,
     ERR_TIMEOUT,
@@ -168,10 +169,12 @@ class Dispatcher:
         with self._lock:
             self._active += 1
         self._set_busy_flag(True)  # before the op runs: a modal it raises blocks us here
+        ctx = None
+        before = None
+        mutating = op not in self._readonly
         try:
             self._terminate_active_command()
             ctx = Ctx()
-            mutating = op not in self._readonly
             before = self._snapshot(ctx) if mutating else None
 
             result = self._registry[op](ctx, job["params"])
@@ -181,19 +184,38 @@ class Dispatcher:
                 delta = self._delta(before, after)
                 if delta is not None:
                     result.setdefault("_delta", delta)
+                evidence_context = result.pop("_evidence_context", {})
+                evidence = mutation_evidence(before, after, **evidence_context)
+                for key, value in evidence.items():
+                    result.setdefault(key, value)
             box["result"] = result
         except OpError as oe:
-            box["error"] = oe.to_dict()
+            error = oe.to_dict()
+            if mutating:
+                after = self._snapshot(ctx) if ctx is not None else None
+                requested = job["params"].get("edges") if op == "feature.fillet" else None
+                selection = {}
+                if op == "feature.fillet":
+                    selection = {
+                        "requested_edges": requested if isinstance(requested, list) else None,
+                        "resolved_edges": [],
+                    }
+                error.update(mutation_evidence(before, after, succeeded=False, **selection))
+            box["error"] = error
         except Exception as exc:  # noqa: BLE001 - surface everything to the caller
             detail = traceback.format_exc()
             hint = hint_for_exception(exc)
             if hint:
                 detail = hint + "\n---\n" + detail
-            box["error"] = {
+            error = {
                 "code": ERR_INTERNAL,
                 "message": str(exc) or exc.__class__.__name__,
                 "detail": detail,
             }
+            if mutating:
+                after = self._snapshot(ctx) if ctx is not None else None
+                error.update(mutation_evidence(before, after, succeeded=False))
+            box["error"] = error
         finally:
             with self._lock:
                 self._active -= 1
@@ -228,9 +250,17 @@ class Dispatcher:
                 return None
             comps = design.allComponents
             total = 0
+            entities = []
             for i in range(comps.count):
-                total += comps.item(i).bRepBodies.count
-            return {"bodies": total}
+                component = comps.item(i)
+                bodies = component.bRepBodies
+                total += bodies.count
+                for j in range(bodies.count):
+                    body = bodies.item(j)
+                    token = getattr(body, "entityToken", None)
+                    entities.append(token or "{}::{}".format(component.name, body.name))
+            timeline = getattr(getattr(design, "timeline", None), "count", None)
+            return {"bodies": total, "timeline": timeline, "entities": sorted(entities)}
         except Exception:
             return None
 

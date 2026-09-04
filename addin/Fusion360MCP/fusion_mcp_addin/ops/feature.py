@@ -90,12 +90,25 @@ def revolve(ctx, params):
 def fillet(ctx, params):
     body = ctx.get_body(require(params, "body", (int, str)))
     radius = float(require(params, "radius", (int, float)))
-    edges = _edges_collection(ctx, body, params.get("edges", "all"))
+    requested = params.get("edges", "all")
+    resolved = list(range(body.edges.count)) if requested in (None, "all") else list(requested)
+    edges = _edges_collection(ctx, body, requested)
     fillet_feats = ctx.target().features.filletFeatures
     fillet_input = fillet_feats.createInput()
     fillet_input.edgeSetInputs.addConstantRadiusEdgeSet(edges, ctx.len_mm(radius), True)
     feature = fillet_feats.add(fillet_input)
-    return _feature_result(ctx, feature, "fillet")
+    result = _feature_result(ctx, feature, "fillet")
+    target = {"name": body.name}
+    token = getattr(body, "entityToken", None)
+    if token:
+        target["operative_id"] = token
+    result["_evidence_context"] = {
+        "requested_edges": resolved if requested in (None, "all") else requested,
+        "resolved_edges": resolved,
+        "target": target,
+        "radius_mm": radius,
+    }
+    return result
 
 
 @op("feature.chamfer", summary="Chamfer edges of a body. distance in mm; edges='all' or list of indices.")
