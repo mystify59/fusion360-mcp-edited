@@ -32,6 +32,7 @@ Thumbs.db
 *.log
 exports/
 screenshots/
+.worktrees/
 # Part/artifact generation scripts (local only, not shipped)
 parts/
 
