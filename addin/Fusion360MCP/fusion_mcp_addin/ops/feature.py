@@ -2,7 +2,7 @@
 
 import adsk.fusion
 
-from ._common import op, optional, require
+from ._common import _find_component, op, optional, require
 from ..bridge.protocol import ERR_INVALID_PARAMS, ERR_NOT_FOUND, OpError
 
 
@@ -455,6 +455,130 @@ def thread(ctx, params):
         }
     )
     return result
+
+
+def _thread_inspection_value(obj, attribute, field, location, notes):
+    """Read a Fusion thread property without assuming it exists in this API version."""
+    try:
+        return getattr(obj, attribute)
+    except AttributeError:
+        notes.append(
+            "{} unavailable: {} is not exposed by this Fusion API.".format(
+                field, location
+            )
+        )
+    except Exception:
+        notes.append(
+            "{} unavailable: {} could not be read from this Fusion API.".format(
+                field, location
+            )
+        )
+    return None
+
+
+@op(
+    "feature.list_threads",
+    summary="Inspect thread features in the active or named component without modifying it.",
+    readonly=True,
+)
+def list_threads(ctx, params):
+    """Return actual Fusion thread-feature metadata without deriving missing values."""
+    component_name = optional(params, "component", None, types=str)
+    if component_name is None:
+        component = ctx.target()
+    else:
+        component = _find_component(ctx.design(), component_name)
+        if component is None:
+            raise OpError(
+                ERR_NOT_FOUND,
+                "No component named '{}'. Use assembly.list_occurrences.".format(
+                    component_name
+                ),
+            )
+
+    thread_features = component.features.threadFeatures
+    threads = []
+    for index in range(thread_features.count):
+        feature = thread_features.item(index)
+        notes = []
+        thread_info = _thread_inspection_value(
+            feature, "threadInfo", "thread_info", "threadInfo", notes
+        )
+
+        if thread_info is None:
+            for field, location in (
+                ("thread_type", "threadInfo.threadType"),
+                ("designation", "threadInfo.threadDesignation"),
+                ("thread_class", "threadInfo.threadClass"),
+                ("internal", "threadInfo.isInternal"),
+                ("handedness", "threadInfo.isRightHanded"),
+            ):
+                notes.append(
+                    "{} unavailable: {} is not exposed by this Fusion API.".format(
+                        field, location
+                    )
+                )
+            thread_type = designation = thread_class = internal = handedness = None
+        else:
+            thread_type = _thread_inspection_value(
+                thread_info, "threadType", "thread_type", "threadInfo.threadType", notes
+            )
+            designation = _thread_inspection_value(
+                thread_info,
+                "threadDesignation",
+                "designation",
+                "threadInfo.threadDesignation",
+                notes,
+            )
+            thread_class = _thread_inspection_value(
+                thread_info,
+                "threadClass",
+                "thread_class",
+                "threadInfo.threadClass",
+                notes,
+            )
+            internal = _thread_inspection_value(
+                thread_info, "isInternal", "internal", "threadInfo.isInternal", notes
+            )
+            is_right_handed = _thread_inspection_value(
+                thread_info,
+                "isRightHanded",
+                "handedness",
+                "threadInfo.isRightHanded",
+                notes,
+            )
+            if is_right_handed is True:
+                handedness = "right"
+            elif is_right_handed is False:
+                handedness = "left"
+            else:
+                handedness = None
+                if is_right_handed is None and not any(
+                    note.startswith("handedness unavailable:") for note in notes
+                ):
+                    notes.append(
+                        "handedness unavailable: threadInfo.isRightHanded returned no value."
+                    )
+
+        threads.append(
+            {
+                "index": index,
+                "name": _thread_inspection_value(feature, "name", "name", "name", notes),
+                "thread_type": thread_type,
+                "designation": designation,
+                "thread_class": thread_class,
+                "internal": internal,
+                "modeled": _thread_inspection_value(
+                    feature, "isModeled", "modeled", "isModeled", notes
+                ),
+                "handedness": handedness,
+                "full_length": _thread_inspection_value(
+                    feature, "isFullLength", "full_length", "isFullLength", notes
+                ),
+                "capability_notes": notes,
+            }
+        )
+    return {"component": component.name, "count": len(threads), "threads": threads}
 
 
 @op("feature.list", summary="List timeline features in creation order.", readonly=True)

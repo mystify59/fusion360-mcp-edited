@@ -190,6 +190,11 @@ def register(mcp, client):
         )
 
     @mcp.tool(annotations=anno(readonly=True))
+    def fusion_list_threads(component: Optional[str] = None) -> dict:
+        """Inspect thread features in the active or named component without modifying it."""
+        return client.call("feature.list_threads", {"component": component})
+
+    @mcp.tool(annotations=anno(readonly=True))
     def fusion_list_features() -> dict:
         """List timeline features in creation order."""
         return client.call("feature.list")
