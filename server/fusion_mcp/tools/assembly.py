@@ -7,10 +7,22 @@ from ._helpers import anno
 
 def register(mcp, client):
     @mcp.tool(annotations=anno())
-    def fusion_create_component(name: str) -> dict:
-        """Create a new (empty) component as an occurrence in the design. Build
-        geometry, then joint components together to form an assembly."""
-        return client.call("assembly.create_component", {"name": name})
+    def fusion_create_component(name: str, activate: bool = True) -> dict:
+        """Create a component occurrence, optionally making it the build target."""
+        return client.call("assembly.create_component", {"name": name, "activate": activate})
+
+    @mcp.tool(annotations=anno())
+    def fusion_set_active_component(name: str = "root") -> dict:
+        """Set the build target for subsequent sketch, primitive, and feature operations.
+
+        Use ``root`` to reset targeting to the root component.
+        """
+        return client.call("assembly.activate_component", {"name": name})
+
+    @mcp.tool(annotations=anno(readonly=True))
+    def fusion_get_active_component() -> dict:
+        """Return the current build target; subsequent build operations target it."""
+        return client.call("assembly.active_component")
 
     @mcp.tool(annotations=anno(readonly=True))
     def fusion_list_occurrences() -> dict:
