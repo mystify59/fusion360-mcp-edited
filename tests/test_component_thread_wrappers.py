@@ -155,6 +155,18 @@ def test_list_threads_is_read_only(tools):
     assert "component" in tool.parameters["properties"]
 
 
+def test_list_threads_forwards_default_and_named_component(recording_tools):
+    tools, calls = recording_tools
+
+    tools["fusion_list_threads"].fn()
+    tools["fusion_list_threads"].fn(component="Nut")
+
+    assert calls == [
+        ("feature.list_threads", {"component": None}),
+        ("feature.list_threads", {"component": "Nut"}),
+    ]
+
+
 def test_thread_inspection_contract_is_explicit():
     text = ADDIN_FEATURE.read_text(encoding="utf-8")
     for field in [
@@ -165,6 +177,8 @@ def test_thread_inspection_contract_is_explicit():
         "modeled",
         "handedness",
         "full_length",
+        "owner",
+        "size",
         "capability_notes",
     ]:
         assert '"{}"'.format(field) in text
@@ -224,11 +238,13 @@ def test_list_threads_reads_thread_properties_without_mutating_target(addin_thre
         threadType="ISO Metric profile",
         threadDesignation="M10x1.5",
         threadClass="6g",
+        threadSize="10 mm",
         isInternal=False,
         isRightHanded=False,
     )
     feature = SimpleNamespace(
         name="Thread1",
+        parentComponent=SimpleNamespace(name="Feature owner"),
         threadInfo=thread_info,
         isModeled=True,
         isFullLength=False,
@@ -253,9 +269,11 @@ def test_list_threads_reads_thread_properties_without_mutating_target(addin_thre
             {
                 "index": 0,
                 "name": "Thread1",
+                "owner": "Feature owner",
                 "thread_type": "ISO Metric profile",
                 "designation": "M10x1.5",
                 "thread_class": "6g",
+                "size": "10 mm",
                 "internal": False,
                 "modeled": True,
                 "handedness": "left",
@@ -282,15 +300,68 @@ def test_list_threads_uses_null_and_notes_when_fusion_properties_are_unavailable
     result = addin_thread_inspector.list_threads(ctx, {})
 
     thread = result["threads"][0]
+    assert thread["owner"] == "Active"
     assert thread["thread_type"] == "ISO Metric profile"
     assert thread["designation"] is None
     assert thread["thread_class"] is None
+    assert thread["size"] is None
     assert thread["internal"] is None
     assert thread["modeled"] is None
     assert thread["handedness"] is None
     assert thread["full_length"] is None
+    assert "owner fallback: feature.parentComponent is not exposed by this Fusion API; using enumerated component 'Active'." in thread["capability_notes"]
     assert "handedness unavailable: threadInfo.isRightHanded is not exposed by this Fusion API." in thread["capability_notes"]
     assert all("left" not in note.lower() for note in thread["capability_notes"])
+
+
+@pytest.mark.parametrize(
+    ("feature_factory", "parent_note", "child_note"),
+    [
+        (
+            lambda: SimpleNamespace(name="Thread1"),
+            "thread_info unavailable: threadInfo is not exposed by this Fusion API.",
+            "thread_type unavailable: threadInfo is not exposed by this Fusion API.",
+        ),
+        (
+            lambda: type(
+                "RaisingThreadInfoFeature",
+                (),
+                {
+                    "name": "Thread1",
+                    "threadInfo": property(
+                        lambda self: (_ for _ in ()).throw(RuntimeError("unavailable"))
+                    ),
+                },
+            )(),
+            "thread_info unavailable: threadInfo could not be read from this Fusion API.",
+            "thread_type unavailable: threadInfo could not be read from this Fusion API.",
+        ),
+        (
+            lambda: SimpleNamespace(name="Thread1", threadInfo=None),
+            "thread_info unavailable: threadInfo returned no value.",
+            "thread_type unavailable: threadInfo returned no value.",
+        ),
+    ],
+    ids=("absent", "raises", "none"),
+)
+def test_list_threads_distinguishes_unavailable_thread_info_states(
+    addin_thread_inspector, feature_factory, parent_note, child_note
+):
+    feature = feature_factory()
+    component = SimpleNamespace(
+        name="Active",
+        features=SimpleNamespace(threadFeatures=SimpleNamespace(count=1, item=lambda index: feature)),
+    )
+
+    thread = addin_thread_inspector.list_threads(
+        SimpleNamespace(target=lambda: component), {}
+    )["threads"][0]
+
+    assert thread["thread_type"] is None
+    assert thread["size"] is None
+    assert parent_note in thread["capability_notes"]
+    assert child_note in thread["capability_notes"]
+    assert "thread_type unavailable: threadInfo.threadType is not exposed by this Fusion API." not in thread["capability_notes"]
 
 
 def test_list_threads_records_a_capability_note_when_a_property_read_raises(
@@ -302,6 +373,7 @@ def test_list_threads_records_a_capability_note_when_a_property_read_raises(
             threadType="ISO Metric profile",
             threadDesignation="M10x1.5",
             threadClass="6g",
+            threadSize="10 mm",
             isInternal=False,
             isRightHanded=True,
         )
@@ -320,6 +392,7 @@ def test_list_threads_records_a_capability_note_when_a_property_read_raises(
 
     thread = result["threads"][0]
     assert thread["modeled"] is None
+    assert thread["size"] == "10 mm"
     assert "modeled unavailable: isModeled could not be read from this Fusion API." in thread[
         "capability_notes"
     ]

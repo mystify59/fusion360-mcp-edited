@@ -460,20 +460,73 @@ def thread(ctx, params):
 def _thread_inspection_value(obj, attribute, field, location, notes):
     """Read a Fusion thread property without assuming it exists in this API version."""
     try:
-        return getattr(obj, attribute)
+        value = getattr(obj, attribute)
     except AttributeError:
         notes.append(
             "{} unavailable: {} is not exposed by this Fusion API.".format(
                 field, location
             )
         )
+        return None, "absent"
     except Exception:
         notes.append(
             "{} unavailable: {} could not be read from this Fusion API.".format(
                 field, location
             )
         )
-    return None
+        return None, "error"
+    if value is None:
+        notes.append(
+            "{} unavailable: {} returned no value.".format(field, location)
+        )
+        return None, "none"
+    return value, "value"
+
+
+def _thread_owner(feature, component, notes):
+    """Return a ThreadFeature owner, falling back only when Fusion cannot expose it."""
+    fallback = component.name
+    try:
+        owner_component = feature.parentComponent
+    except AttributeError:
+        notes.append(
+            "owner fallback: feature.parentComponent is not exposed by this Fusion API; "
+            "using enumerated component '{}'.".format(fallback)
+        )
+        return fallback
+    except Exception:
+        notes.append(
+            "owner fallback: feature.parentComponent could not be read from this Fusion API; "
+            "using enumerated component '{}'.".format(fallback)
+        )
+        return fallback
+    if owner_component is None:
+        notes.append(
+            "owner fallback: feature.parentComponent returned no value; using enumerated "
+            "component '{}'.".format(fallback)
+        )
+        return fallback
+    try:
+        owner = owner_component.name
+    except AttributeError:
+        notes.append(
+            "owner fallback: feature.parentComponent.name is not exposed by this Fusion API; "
+            "using enumerated component '{}'.".format(fallback)
+        )
+        return fallback
+    except Exception:
+        notes.append(
+            "owner fallback: feature.parentComponent.name could not be read from this Fusion API; "
+            "using enumerated component '{}'.".format(fallback)
+        )
+        return fallback
+    if owner is None:
+        notes.append(
+            "owner fallback: feature.parentComponent.name returned no value; using enumerated "
+            "component '{}'.".format(fallback)
+        )
+        return fallback
+    return owner
 
 
 @op(
@@ -501,46 +554,53 @@ def list_threads(ctx, params):
     for index in range(thread_features.count):
         feature = thread_features.item(index)
         notes = []
-        thread_info = _thread_inspection_value(
+        thread_info, thread_info_state = _thread_inspection_value(
             feature, "threadInfo", "thread_info", "threadInfo", notes
         )
 
-        if thread_info is None:
-            for field, location in (
-                ("thread_type", "threadInfo.threadType"),
-                ("designation", "threadInfo.threadDesignation"),
-                ("thread_class", "threadInfo.threadClass"),
-                ("internal", "threadInfo.isInternal"),
-                ("handedness", "threadInfo.isRightHanded"),
+        if thread_info_state != "value":
+            parent_detail = {
+                "absent": "threadInfo is not exposed by this Fusion API",
+                "error": "threadInfo could not be read from this Fusion API",
+                "none": "threadInfo returned no value",
+            }[thread_info_state]
+            for field in (
+                "thread_type",
+                "designation",
+                "thread_class",
+                "size",
+                "internal",
+                "handedness",
             ):
                 notes.append(
-                    "{} unavailable: {} is not exposed by this Fusion API.".format(
-                        field, location
-                    )
+                    "{} unavailable: {}.".format(field, parent_detail)
                 )
-            thread_type = designation = thread_class = internal = handedness = None
+            thread_type = designation = thread_class = size = internal = handedness = None
         else:
-            thread_type = _thread_inspection_value(
+            thread_type, _ = _thread_inspection_value(
                 thread_info, "threadType", "thread_type", "threadInfo.threadType", notes
             )
-            designation = _thread_inspection_value(
+            designation, _ = _thread_inspection_value(
                 thread_info,
                 "threadDesignation",
                 "designation",
                 "threadInfo.threadDesignation",
                 notes,
             )
-            thread_class = _thread_inspection_value(
+            thread_class, _ = _thread_inspection_value(
                 thread_info,
                 "threadClass",
                 "thread_class",
                 "threadInfo.threadClass",
                 notes,
             )
-            internal = _thread_inspection_value(
+            size, _ = _thread_inspection_value(
+                thread_info, "threadSize", "size", "threadInfo.threadSize", notes
+            )
+            internal, _ = _thread_inspection_value(
                 thread_info, "isInternal", "internal", "threadInfo.isInternal", notes
             )
-            is_right_handed = _thread_inspection_value(
+            is_right_handed, handedness_state = _thread_inspection_value(
                 thread_info,
                 "isRightHanded",
                 "handedness",
@@ -553,28 +613,31 @@ def list_threads(ctx, params):
                 handedness = "left"
             else:
                 handedness = None
-                if is_right_handed is None and not any(
-                    note.startswith("handedness unavailable:") for note in notes
-                ):
+                if handedness_state == "value":
                     notes.append(
-                        "handedness unavailable: threadInfo.isRightHanded returned no value."
+                        "handedness unavailable: threadInfo.isRightHanded returned a non-boolean value."
                     )
 
+        name, _ = _thread_inspection_value(feature, "name", "name", "name", notes)
+        modeled, _ = _thread_inspection_value(
+            feature, "isModeled", "modeled", "isModeled", notes
+        )
+        full_length, _ = _thread_inspection_value(
+            feature, "isFullLength", "full_length", "isFullLength", notes
+        )
         threads.append(
             {
                 "index": index,
-                "name": _thread_inspection_value(feature, "name", "name", "name", notes),
+                "name": name,
+                "owner": _thread_owner(feature, component, notes),
                 "thread_type": thread_type,
                 "designation": designation,
                 "thread_class": thread_class,
+                "size": size,
                 "internal": internal,
-                "modeled": _thread_inspection_value(
-                    feature, "isModeled", "modeled", "isModeled", notes
-                ),
+                "modeled": modeled,
                 "handedness": handedness,
-                "full_length": _thread_inspection_value(
-                    feature, "isFullLength", "full_length", "isFullLength", notes
-                ),
+                "full_length": full_length,
                 "capability_notes": notes,
             }
         )
