@@ -125,6 +125,47 @@ Claude Desktop、Claude Code、Cursor、VS Code、通用客户端或远端/HTTP 
 
 ---
 
+## 零部件目标与显式螺纹
+
+创建零部件时仍保持原有默认行为——新零部件会被激活：
+`fusion_create_component(name: str, activate: bool = True) -> dict`。如果只想创建
+零部件而不改变当前建模目标，请传 `activate=False`，之后再显式选择和检查目标：
+
+```python
+fusion_create_component(name="Thread demo", activate=False)
+fusion_set_active_component(name="Thread demo")  # name="root" 是默认值
+fusion_get_active_component()                     # 只读
+fusion_set_active_component()                     # 重置为根部件
+```
+
+目标工具的签名为 `fusion_set_active_component(name: str = "root") -> dict` 和
+`fusion_get_active_component() -> dict`。螺纹工具的完整签名为
+`fusion_thread(body: Union[int, str], face: int, internal: bool = False,
+modeled: bool = True, thread_type: str = "ISO Metric profile",
+designation: Optional[str] = None, thread_class: Optional[str] = None,
+handedness: str = "right") -> dict`。省略 `designation` 时，由 Fusion 根据直径
+推荐；也可显式选择目录条目：
+
+```python
+fusion_thread(
+    body="M8 left shaft",
+    face=2,
+    modeled=True,
+    designation="M8x1.25",
+    handedness="left",
+)
+fusion_list_threads(component="Thread demo")  # component=None 使用活动目标
+```
+
+`thread_type`、`designation` 与 `thread_class` 以 Fusion 目录中的拼写为准；
+显式指定的规格/等级会先按目录验证。`handedness` 只支持 `"right"` 和
+`"left"`（忽略大小写和首尾空格），不受支持的值会在创建任何螺纹前失败。
+`fusion_list_threads(component: Optional[str] = None) -> dict` 是只读工具，返回 Fusion
+实际暴露的特征元数据；若当前安装的 API 无法暴露某属性，该字段为 `null`，并在
+`capability_notes` 中说明原因。
+
+---
+
 ## 开发与测试
 
 以下脚本就是用来在真实 Fusion 上验证本项目的。

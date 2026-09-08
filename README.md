@@ -125,6 +125,49 @@ All optional; defaults shown. See [.env.example](.env.example).
 
 ---
 
+## Component targets & explicit threads
+
+Component creation keeps its existing default of activating the new component:
+`fusion_create_component(name: str, activate: bool = True) -> dict`. Pass
+`activate=False` when the occurrence should be created without changing the current
+build target, then select and inspect the target explicitly:
+
+```python
+fusion_create_component(name="Thread demo", activate=False)
+fusion_set_active_component(name="Thread demo")  # name="root" is the default
+fusion_get_active_component()                     # read-only
+fusion_set_active_component()                     # reset to root
+```
+
+The target wrappers are `fusion_set_active_component(name: str = "root") -> dict`
+and `fusion_get_active_component() -> dict`. The full thread signature is
+`fusion_thread(body: Union[int, str], face: int, internal: bool = False,
+modeled: bool = True, thread_type: str = "ISO Metric profile",
+designation: Optional[str] = None, thread_class: Optional[str] = None,
+handedness: str = "right") -> dict`. Omit `designation` to use Fusion's
+diameter-based recommendation, or select a catalog entry explicitly:
+
+```python
+fusion_thread(
+    body="M8 left shaft",
+    face=2,
+    modeled=True,
+    designation="M8x1.25",
+    handedness="left",
+)
+fusion_list_threads(component="Thread demo")  # component=None uses the active target
+```
+
+Fusion's catalog spelling is authoritative for `thread_type`, `designation`, and
+`thread_class`; an explicit designation/class is validated against that catalog.
+Only `handedness="right"` and `handedness="left"` are supported (case and outer
+whitespace are normalized), and an unsupported value fails before thread mutation.
+`fusion_list_threads(component: Optional[str] = None) -> dict` is read-only and reports
+the actual feature metadata Fusion exposes, with `null` fields and
+`capability_notes` when the installed API cannot expose a property.
+
+---
+
 ## Development & testing
 
 Everything below was used to validate the project against a real Fusion 360 install.

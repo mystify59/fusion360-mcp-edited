@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- Public component-target tools: `fusion_set_active_component(name="root")` and
+  read-only `fusion_get_active_component()`. The public
+  `fusion_create_component(name, activate=True)` wrapper now exposes the existing
+  activation control; pass `activate=False` to create without changing the target.
+- `fusion_thread` now accepts explicit Fusion catalog `designation` and
+  `thread_class` values plus `handedness="right"|"left"`; omitting designation
+  preserves diameter-based recommendation and right-handed defaults.
+- Read-only `fusion_list_threads(component=None)` reports thread type,
+  designation, class, size, internal/modeled/handed/full-length state, owner, and
+  capability notes from the active or named component.
+
+### Safety
+- Explicit thread designations/classes are validated using Fusion's catalog, whose
+  spelling is authoritative. Unsupported handedness is rejected before creating a
+  thread input or mutating the model.
+
 ## [0.6.0] - 2026-07-29
 
 ### Added — workspace discipline (stop opening a document per task)

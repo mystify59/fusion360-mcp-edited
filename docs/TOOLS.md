@@ -6,7 +6,7 @@ All distances are **millimetres (mm)**; angles are **degrees**. Bodies and sketc
 
 全部尺寸单位为**毫米 (mm)**，角度为**度**。实体/草图用**索引或名称**引用。
 
-Total tools / 工具总数: **108** (includes the gated `fusion_run_script`).
+Total tools / 工具总数: **111** (includes the gated `fusion_run_script`).
 
 | Tool | Hints | Parameters (required **bold**) | Description |
 |------|-------|--------------------------------|-------------|
@@ -30,7 +30,7 @@ Total tools / 工具总数: **108** (includes the gated `fusion_run_script`).
 | `fusion_close_document` | destructive | **save**, document, name, project, description | Close a document — save=true saves it first, save=false discards unsaved changes. Closes the active document unless `document` names another open one. With save=true a never-saved document is written into the active Fusion project first (use `name` / `project` to choose where); if that save fails the document is left open rather than losing the work. |
 | `fusion_close_other_documents` | destructive | save | Close every open document EXCEPT the active one — handy for tidying up after stray documents accumulated. save=false discards their unsaved changes. |
 | `fusion_combine` | destructive | **target**, **tools**, operation, keep_tools | Boolean-combine a target body with one or more tool bodies (by index or name). operation: join (union), cut (subtract tools from target), or intersect. Set keep_tools=true to preserve the tool bodies. |
-| `fusion_create_component` | write | **name** | Create a new (empty) component as an occurrence in the design. Build geometry, then joint components together to form an assembly. |
+| `fusion_create_component` | write | **name**, activate | Create a component occurrence, optionally making it the build target. |
 | `fusion_create_flat_pattern` | write | **body** | Create a flat pattern from an EXISTING sheet-metal body. Note: Fusion's API cannot create sheet-metal flanges/bends (model those interactively). |
 | `fusion_create_parameter` | write | **name**, **expression**, unit, comment | Create a new user parameter (e.g. name='width', expression='40 mm'). |
 | `fusion_create_sketch` | write | plane, name | Create an empty sketch on a base plane (xy/xz/yz) or construction-plane index. |
@@ -49,6 +49,7 @@ Total tools / 工具总数: **108** (includes the gated `fusion_run_script`).
 | `fusion_extrude` | write | **sketch**, **distance**, operation, direction, profile | Extrude a sketch profile by `distance` mm. operation: new/join/cut/ intersect. direction: positive/negative/symmetric. profile: index or 'all'. |
 | `fusion_fillet` | write | **body**, **radius**, edges | Round edges of a body by `radius` mm. edges='all' (default) or a list of edge indices. |
 | `fusion_fit_view` | idempotent | — | Zoom/fit the view to show the whole model. |
+| `fusion_get_active_component` | read-only | — | Return the current build target; subsequent build operations target it. |
 | `fusion_get_body` | read-only | **body** | Detailed info for one body (by index or name): volume, area, face/edge/ vertex counts, and bounding box. |
 | `fusion_get_parameter` | read-only | **name** | Get one parameter by name. |
 | `fusion_get_units` | read-only | — | Get the document's default length unit. |
@@ -68,6 +69,7 @@ Total tools / 工具总数: **108** (includes the gated `fusion_run_script`).
 | `fusion_list_parameters` | read-only | — | List all parameters (user + model) with expression, value, and unit. |
 | `fusion_list_projects` | read-only | — | List the Fusion projects a document can be saved into, and which one is active (where fusion_save_document / _as put a never-saved document). |
 | `fusion_list_sketches` | read-only | — | List sketches with index, name, and number of closed profiles. |
+| `fusion_list_threads` | read-only | component | Inspect thread features in the active or named component without modifying it. |
 | `fusion_loft` | write | **sketches**, operation | Loft a smooth solid between profiles taken from a list of sketch indices/ names (>=2), in order. Each sketch should contain one closed profile. |
 | `fusion_measure_angle` | read-only | **body_a**, **body_b** | Angle (degrees) between the first faces of two bodies. |
 | `fusion_measure_distance` | read-only | **body_a**, **body_b** | Minimum distance in millimetres between two bodies. |
@@ -89,6 +91,7 @@ Total tools / 工具总数: **108** (includes the gated `fusion_run_script`).
 | `fusion_save_document_as` | write | **name**, project, description, document | Save a document as a NEW file called `name` (in `project`, else the active project). Use this to keep the original untouched. The current bridge confirms the document and project but does not return a reopenable version identifier. |
 | `fusion_scale_body` | write | **body**, **factor** | Uniformly scale a body by `factor` about the origin (2.0 doubles its size). |
 | `fusion_screenshot` | read-only | width, height, fit | Capture the active Fusion viewport and return it as a PNG image so you can visually inspect the model. Set fit=False to keep the current camera. |
+| `fusion_set_active_component` | write | name | Set the build target for subsequent sketch, primitive, and feature operations. Use ``root`` to reset targeting to the root component. |
 | `fusion_set_appearance` | idempotent | **body**, **name** | Apply an appearance (by name) to a body. Use fusion_list_appearances to discover valid names (e.g. 'Steel', 'Aluminum', 'ABS'). |
 | `fusion_set_body_visible` | idempotent | **body**, **visible** | Show or hide a body. |
 | `fusion_set_parameter` | idempotent | **name**, **expression** | Set a parameter's expression, e.g. '25 mm' or 'width * 2'. This is the preferred way to resize an existing parametric model. |
@@ -115,6 +118,6 @@ Total tools / 工具总数: **108** (includes the gated `fusion_run_script`).
 | `fusion_surface_stitch` | write | **bodies**, tolerance | Stitch surface bodies (list of indices/names) into one, with tolerance mm. |
 | `fusion_surface_thicken` | write | **body**, **thickness**, direction | Thicken a (surface) body's faces into a solid by thickness mm. direction 'positive' or 'symmetric'. |
 | `fusion_sweep` | write | **profile_sketch**, **path_sketch**, operation, profile | Sweep a profile (from profile_sketch) along the first curve of path_sketch. Draw the path as an open sketch (line/arc/spline) and the profile as a closed sketch, then sweep. |
-| `fusion_thread` | write | **body**, **face**, internal, modeled, thread_type | Add a thread to a cylindrical face (face index from fusion_list_faces, the non-planar one). internal=True for a hole; modeled=True for real geometry. |
+| `fusion_thread` | write | **body**, **face**, internal, modeled, thread_type, designation, thread_class, handedness | Add a thread to a cylindrical face (face index from fusion_list_faces, the non-planar one). internal=True for a hole; modeled=True for real geometry. |
 | `fusion_undo` | write | — | Undo the last operation (guards against a parametric->direct design flip). |
 | `fusion_unsuppress_feature` | idempotent | **name** | Unsuppress a timeline feature by name. |
