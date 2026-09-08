@@ -1,9 +1,21 @@
 """Public wrappers for selecting the active Fusion component."""
 
+from pathlib import Path
+
 import pytest
 
 from fusion_mcp.app import build_app
 from fusion_mcp.config import load_config
+
+
+ADDIN_FEATURE = (
+    Path(__file__).resolve().parents[1]
+    / "addin"
+    / "Fusion360MCP"
+    / "fusion_mcp_addin"
+    / "ops"
+    / "feature.py"
+)
 
 
 @pytest.fixture(scope="module")
@@ -62,3 +74,19 @@ def test_get_active_component_does_not_send_a_payload(recording_tools):
     tools["fusion_get_active_component"].fn()
 
     assert calls == [("assembly.active_component", None)]
+
+
+def test_thread_schema_exposes_explicit_selection(tools):
+    props = tools["fusion_thread"].parameters["properties"]
+    assert props["handedness"]["default"] == "right"
+    assert "designation" in props
+    assert "thread_class" in props
+
+
+def test_addin_thread_sets_handedness_before_mutation():
+    text = ADDIN_FEATURE.read_text(encoding="utf-8")
+    set_pos = text.index("thread_info.isRightHanded = is_right_handed")
+    add_pos = text.index("feature = threads.add(thread_input)", set_pos)
+    assert set_pos < add_pos
+    assert "handedness must be 'right' or 'left'" in text
+    assert "query.allClasses" in text

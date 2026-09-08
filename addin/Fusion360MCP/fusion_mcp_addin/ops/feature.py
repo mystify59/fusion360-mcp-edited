@@ -347,6 +347,12 @@ def thread(ctx, params):
     internal = bool(optional(params, "internal", False, types=bool))
     modeled = bool(optional(params, "modeled", True, types=bool))
     thread_type = optional(params, "thread_type", "ISO Metric profile", types=str)
+    designation = optional(params, "designation", None, types=str)
+    thread_class = optional(params, "thread_class", None, types=str)
+    handedness = optional(params, "handedness", "right", types=str).strip().lower()
+    if handedness not in ("right", "left"):
+        raise OpError(ERR_INVALID_PARAMS, "handedness must be 'right' or 'left'.")
+    is_right_handed = handedness == "right"
 
     threads = ctx.target().features.threadFeatures
     query = threads.threadDataQuery
@@ -354,17 +360,101 @@ def thread(ctx, params):
         diameter_cm = face.geometry.radius * 2.0
     except Exception:
         raise OpError(ERR_INVALID_PARAMS, "Face {} is not cylindrical; thread needs a cylindrical face.".format(face_index))
-    recommend = query.recommendThreadData(diameter_cm, internal, thread_type)
-    # SWIG out-params: returns (success, threadDesignation, threadClass).
-    vals = list(recommend) if isinstance(recommend, (list, tuple)) else [recommend]
-    if len(vals) < 3:
-        raise OpError(ERR_INVALID_PARAMS, "Could not recommend thread data for diameter {:.1f}mm.".format(diameter_cm * 10))
-    designation, thread_class = vals[1], vals[2]
-    thread_info = threads.createThreadInfo(internal, thread_type, designation, thread_class)
+
+    if designation is None:
+        recommend = query.recommendThreadData(diameter_cm, internal, thread_type)
+        # SWIG out-params: returns (success, threadDesignation, threadClass).
+        vals = list(recommend) if isinstance(recommend, (list, tuple)) else [recommend]
+        if len(vals) < 3 or not vals[0]:
+            raise OpError(
+                ERR_INVALID_PARAMS,
+                "Could not recommend thread data for diameter {:.1f}mm.".format(
+                    diameter_cm * 10
+                ),
+            )
+        designation = vals[1]
+        recommended_class = vals[2]
+        if thread_class is None:
+            thread_class = recommended_class
+        else:
+            classes = list(query.allClasses(internal, thread_type, designation))
+            if thread_class not in classes:
+                raise OpError(
+                    ERR_INVALID_PARAMS,
+                    "Thread class '{}' is not available for designation '{}'.".format(
+                        thread_class, designation
+                    ),
+                )
+    else:
+        classes = list(query.allClasses(internal, thread_type, designation))
+        if not classes:
+            raise OpError(
+                ERR_INVALID_PARAMS,
+                "No thread classes are available for designation '{}'.".format(
+                    designation
+                ),
+            )
+        if thread_class is None:
+            thread_class = classes[0]
+        elif thread_class not in classes:
+            raise OpError(
+                ERR_INVALID_PARAMS,
+                "Thread class '{}' is not available for designation '{}'.".format(
+                    thread_class, designation
+                ),
+            )
+
+    try:
+        thread_info = adsk.fusion.ThreadInfo.create(
+            False,
+            internal,
+            thread_type,
+            designation,
+            thread_class,
+            is_right_handed,
+        )
+    except (AttributeError, TypeError):
+        thread_info = threads.createThreadInfo(
+            internal, thread_type, designation, thread_class
+        )
+        if not hasattr(thread_info, "isRightHanded"):
+            raise OpError(
+                ERR_INVALID_PARAMS,
+                "Installed Fusion API cannot create verifiable left/right-handed threads.",
+            )
+        try:
+            thread_info.isRightHanded = is_right_handed
+        except Exception:
+            raise OpError(
+                ERR_INVALID_PARAMS,
+                "Installed Fusion API cannot create verifiable left/right-handed threads.",
+            )
+
+    try:
+        handedness_verified = bool(thread_info.isRightHanded) == is_right_handed
+    except Exception:
+        handedness_verified = False
+    if not handedness_verified:
+        raise OpError(
+            ERR_INVALID_PARAMS,
+            "Installed Fusion API cannot create verifiable left/right-handed threads.",
+        )
+
     thread_input = threads.createInput(face, thread_info)
     thread_input.isModeled = modeled
     feature = threads.add(thread_input)
-    return _feature_result(ctx, feature, "thread")
+    result = _feature_result(ctx, feature, "thread")
+    result.update(
+        {
+            "thread_type": thread_type,
+            "designation": designation,
+            "thread_class": thread_class,
+            "internal": internal,
+            "modeled": bool(feature.isModeled),
+            "handedness": "right" if feature.isRightHanded else "left",
+        }
+    )
+    return result
 
 
 @op("feature.list", summary="List timeline features in creation order.", readonly=True)

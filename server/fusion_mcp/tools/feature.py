@@ -170,12 +170,23 @@ def register(mcp, client):
     def fusion_thread(
         body: Union[int, str], face: int, internal: bool = False, modeled: bool = True,
         thread_type: str = "ISO Metric profile",
+        designation: Optional[str] = None, thread_class: Optional[str] = None,
+        handedness: str = "right",
     ) -> dict:
         """Add a thread to a cylindrical face (face index from fusion_list_faces, the
         non-planar one). internal=True for a hole; modeled=True for real geometry."""
         return client.call(
             "feature.thread",
-            {"body": body, "face": face, "internal": internal, "modeled": modeled, "thread_type": thread_type},
+            {
+                "body": body,
+                "face": face,
+                "internal": internal,
+                "modeled": modeled,
+                "thread_type": thread_type,
+                "designation": designation,
+                "thread_class": thread_class,
+                "handedness": handedness,
+            },
         )
 
     @mcp.tool(annotations=anno(readonly=True))
