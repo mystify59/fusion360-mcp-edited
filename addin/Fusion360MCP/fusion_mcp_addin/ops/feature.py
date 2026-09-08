@@ -2,7 +2,7 @@
 
 import adsk.fusion
 
-from ._common import _find_component, op, optional, require
+from ._common import op, optional, require
 from ..bridge.protocol import ERR_INVALID_PARAMS, ERR_NOT_FOUND, OpError
 
 
@@ -540,6 +540,8 @@ def list_threads(ctx, params):
     if component_name is None:
         component = ctx.target()
     else:
+        from ._common import _find_component
+
         component = _find_component(ctx.design(), component_name)
         if component is None:
             raise OpError(
